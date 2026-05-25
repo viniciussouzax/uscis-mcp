@@ -1,0 +1,34 @@
+{
+  "name": "uscis-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for USCIS regulations, form documentation requirements, and processing times",
+  "type": "module",
+  "bin": {
+    "uscis-mcp-server": "dist/index.js",
+    "uscis-mcp-server-http": "dist/http.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "smoke": "node dist/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "cheerio": "^1.0.0",
+    "express": "^4.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "license": "MIT"
+}
