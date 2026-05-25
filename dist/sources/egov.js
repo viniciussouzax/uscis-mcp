@@ -20,9 +20,41 @@
  * still return named centers (Nebraska, Vermont, etc.) — we surface
  * whatever the API returns rather than forcing a translation.
  */
-import { httpGetJson } from "../lib/http.js";
+import { httpGet } from "../lib/http.js";
 import { cache, TTL } from "../lib/cache.js";
 const BASE = "https://egov.uscis.gov/processing-times/api";
+// egov.uscis.gov is behind a Cloudflare WAF. It blocks requests that don't
+// pass a JavaScript-based challenge — browser-like headers alone are not
+// enough because Cloudflare also checks the TLS fingerprint (JA3). Node's
+// built-in fetch() has a different TLS fingerprint from Chrome regardless of
+// what User-Agent is sent.
+const EGOV_OPTS = {
+    headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        Referer: "https://egov.uscis.gov/processing-times/",
+    },
+};
+const WAF_ERROR = "egov.uscis.gov is protected by Cloudflare bot detection, which requires " +
+    "JavaScript challenge execution and a browser-matching TLS fingerprint. " +
+    "A plain HTTP client cannot pass this check. To make this tool work, the " +
+    "egov source needs to be rewritten to use a headless browser (e.g. " +
+    "Playwright) or an alternative USCIS data source.";
+async function egovGet(url) {
+    const { body, status, contentType } = await httpGet(url, EGOV_OPTS);
+    if (status === 403 || (status >= 400 && contentType.includes("text/html"))) {
+        throw new Error(WAF_ERROR);
+    }
+    if (status >= 400) {
+        throw new Error(`HTTP ${status} for ${url}: ${body.slice(0, 200)}`);
+    }
+    try {
+        return JSON.parse(body);
+    }
+    catch {
+        throw new Error(`Expected JSON from ${url}, got: ${body.slice(0, 200)}`);
+    }
+}
 // ── Step 1: list forms (cached for a day) ───────────────────────────────────
 export async function listForms() {
     const cacheKey = "egov:forms";
@@ -30,7 +62,7 @@ export async function listForms() {
     if (cached)
         return cached;
     const url = `${BASE}/forms`;
-    const json = await httpGetJson(url);
+    const json = await egovGet(url);
     const forms = json.data?.forms ?? json.forms ?? [];
     const names = forms.map((f) => f.form_name).filter(Boolean);
     cache.set(cacheKey, names, TTL.ONE_DAY);
@@ -44,7 +76,7 @@ export async function listFormTypes(formId) {
     if (cached)
         return cached;
     const url = `${BASE}/formtypes/${encodeURIComponent(f)}`;
-    const json = await httpGetJson(url);
+    const json = await egovGet(url);
     const types = json.data?.form_types ?? json.form_types ?? [];
     cache.set(cacheKey, types, TTL.ONE_DAY);
     return types;
@@ -57,7 +89,7 @@ export async function listOffices(formId, formTypeId) {
     if (cached)
         return cached;
     const url = `${BASE}/offices/${encodeURIComponent(f)}/${encodeURIComponent(formTypeId)}`;
-    const json = await httpGetJson(url);
+    const json = await egovGet(url);
     const offices = json.data?.offices ?? json.offices ?? [];
     cache.set(cacheKey, offices, TTL.ONE_DAY);
     return offices;
@@ -92,7 +124,7 @@ export async function getProcessingTime(args) {
     const cached = cache.get(cacheKey);
     if (cached)
         return { payload: cached, sourceUrl: url };
-    const json = await httpGetJson(url);
+    const json = await egovGet(url);
     const pt = json.data?.processing_time ?? json.processing_time;
     if (!pt) {
         throw new Error(`Processing time payload was empty for ${formId}/${formTypeId}/${officeCode}.`);
