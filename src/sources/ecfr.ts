@@ -113,18 +113,46 @@ export interface SectionContent {
  * (returns clean XML) and strip tags for readable text, while preserving
  * paragraph structure.
  */
+// ── Latest issue date ────────────────────────────────────────────────────────
+
+interface TitlesResp {
+  titles?: Array<{ number: number | string; latest_issue_date?: string }>;
+}
+
+/**
+ * eCFR titles have a publication lag — using "today" returns 404 when the
+ * title hasn't been updated yet. This fetches the actual latest issue date.
+ */
+async function getLatestIssueDate(titleNumber: string): Promise<string> {
+  const cacheKey = `ecfr:latest_date:${titleNumber}`;
+  const cached = cache.get(cacheKey) as string | null;
+  if (cached) return cached;
+
+  const url = `${BASE}/api/versioner/v1/titles`;
+  const json = await httpGetJson<TitlesResp>(url);
+  const entry = (json.titles ?? []).find(
+    (t) => String(t.number) === String(titleNumber),
+  );
+
+  const date =
+    entry?.latest_issue_date ?? new Date().toISOString().slice(0, 10);
+  cache.set(cacheKey, date, TTL.ONE_DAY);
+  return date;
+}
+
 export async function getSection(
   citation: string,
 ): Promise<{ payload: SectionContent; sourceUrl: string }> {
   const { title, part, section } = parseCitation(citation);
 
-  // eCFR versioner needs a date. "current" isn't a date — use today.
-  const today = new Date().toISOString().slice(0, 10);
+  // Use the actual latest published date — eCFR has a multi-day publication
+  // lag and returns 404 if you request a date past the latest issue date.
+  const issueDate = await getLatestIssueDate(title);
 
   // We request the whole part as XML and then extract the section we want.
   // Pulling the whole part is cheap (most parts are <1MB) and we cache it.
   const url =
-    `${BASE}/api/versioner/v1/full/${today}/title-${title}.xml?part=${part}`;
+    `${BASE}/api/versioner/v1/full/${issueDate}/title-${title}.xml?part=${part}`;
 
   const cacheKey = `ecfr:section:${title}:${part}:${section ?? "all"}`;
   const cached = cache.get(cacheKey) as SectionContent | null;
@@ -144,7 +172,7 @@ export async function getSection(
     part_label: `Part ${part}`,
     section_label: section ? `§ ${section}` : undefined,
     text: extracted,
-    effective_date: today,
+    effective_date: issueDate,
   };
 
   cache.set(cacheKey, payload, TTL.SIX_HOURS);
