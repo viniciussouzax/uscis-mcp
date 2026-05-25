@@ -1,6 +1,6 @@
 # USCIS MCP Server
 
-A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, and processing-time estimates pulled directly from US government sources.
+A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, and processing-time estimates.
 
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/typescript-5.5-blue.svg)](https://www.typescriptlang.org/)
@@ -17,7 +17,7 @@ Plugs into Claude and exposes four tools so the model can answer immigration que
 | `search_regulations` | Full-text search of Title 8 CFR (Aliens and Nationality) | [eCFR API](https://www.ecfr.gov) |
 | `get_visa_category_rules` | Full regulatory text by citation (e.g. `8 CFR 214.2(h)`) | eCFR versioner |
 | `get_form_requirements` | "What to file" / "Where to file" / fees for any USCIS form | [USCIS.gov](https://www.uscis.gov) |
-| `get_processing_time` | Current monthly processing estimates by form + office | [egov.uscis.gov](https://egov.uscis.gov/processing-times) |
+| `get_processing_time` | Current monthly processing estimates by form + office | [immigrationtimes.org](https://immigrationtimes.org) |
 
 Every response is wrapped in an envelope containing `source_url` and `fetched_at` so consumers can verify provenance.
 
@@ -142,7 +142,7 @@ src/
     http.ts                # fetch wrapper with retries + backoff
   sources/
     ecfr.ts                # eCFR search + section retrieval
-    egov.ts                # USCIS processing-times API client
+    immigrationtimes.ts    # immigrationtimes.org processing-times client
     uscis-forms.ts         # USCIS.gov form-page scraper (cheerio)
   tools/
     search-regulations.ts
@@ -153,7 +153,7 @@ src/
 
 ## Caveats
 
-1. **The egov processing-times API is undocumented.** USCIS may change its shape without notice. The connector handles two known response variants, but break-fix may be needed if they ship a third.
+1. **immigrationtimes.org is an unofficial source.** It aggregates USCIS data but is not operated by the government. If it goes down or changes its API shape, processing-time queries will fail until the source is updated.
 2. **USCIS.gov page structure can drift.** The form-requirements scraper uses heading-based heuristics. If a major redesign ships, you'll get sparser results until selectors are updated — the source URL is always included so the LLM can fall back to fetching the page itself.
 3. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
 4. **Not affiliated with USCIS.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.

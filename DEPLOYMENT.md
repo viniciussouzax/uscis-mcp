@@ -27,7 +27,7 @@ This guide covers running the USCIS MCP Server in real environments — from a d
 |---|---|
 | Node.js ≥ 18 | The MCP SDK and the server use modern ESM and `fetch`. Node 18 LTS is the minimum. Node 20 or 22 LTS is recommended. |
 | `npm` (or `pnpm` / `yarn`) | For installing dependencies and running scripts. |
-| Outbound internet on ports 80/443 | The server makes live calls to `www.ecfr.gov`, `www.uscis.gov`, and `egov.uscis.gov`. |
+| Outbound internet on ports 80/443 | The server makes live calls to `www.ecfr.gov`, `www.uscis.gov`, and `immigrationtimes.org`. |
 | ~150 MB free disk | For `node_modules` and the compiled `dist/`. |
 
 Check your Node version:
@@ -129,7 +129,7 @@ Ask Claude:
 
 > *"Use the USCIS tools to get the current processing time for an I-765."*
 
-Claude should invoke `get_processing_time` and return a current estimate with a `source_url` pointing at `egov.uscis.gov`.
+Claude should invoke `get_processing_time` and return a current estimate with a `source_url` pointing at `immigrationtimes.org`.
 
 ## 4. Scenario B — HTTP server on your laptop (localhost only)
 
@@ -533,8 +533,8 @@ curl 'https://www.ecfr.gov/api/search/v1/results?query=H-1B&hierarchy%5Btitle%5D
 # USCIS form page
 curl -s https://www.uscis.gov/i-130 | head -50
 
-# USCIS processing times
-curl 'https://egov.uscis.gov/processing-times/api/forms'
+# Processing times
+curl 'https://immigrationtimes.org/api/v1/forms'
 ```
 
 Every tool response includes `source_url` — copy it into curl to reproduce.
@@ -576,7 +576,7 @@ Test directly:
 
 ```bash
 curl -v https://www.ecfr.gov/api/search/v1/results?query=test
-curl -v https://egov.uscis.gov/processing-times/api/forms
+curl -v https://immigrationtimes.org/api/v1/forms
 ```
 
 ### Claude Desktop doesn't show the tools
@@ -606,13 +606,13 @@ Fix by either binding to `0.0.0.0` (with `AUTH_TOKEN`!) or by setting the proxy 
 
 ### Processing-time queries return empty results
 
-USCIS may have changed the API shape. Check the raw upstream response:
+immigrationtimes.org may have changed its API shape. Check the raw upstream response:
 
 ```bash
-curl 'https://egov.uscis.gov/processing-times/api/formtypes/I-485'
+curl 'https://immigrationtimes.org/api/v1/formtypes/I-485'
 ```
 
-If the structure looks different from what the code in `src/sources/egov.ts` expects, you'll need a small patch to the response-handling section. Open an issue with the curl output attached.
+If the structure looks different from what the code in `src/sources/immigrationtimes.ts` expects, you'll need a small patch to the response-handling section. Open an issue with the curl output attached.
 
 ### Form requirements come back sparse or empty
 
