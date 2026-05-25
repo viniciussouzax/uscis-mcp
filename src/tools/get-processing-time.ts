@@ -1,5 +1,6 @@
+
 import { z } from "zod";
-import { getProcessingTime, listFormTypes, listOffices } from "../sources/egov.js";
+import { getProcessingTime, listFormTypes, listOffices } from "../sources/immigrationtimes.js";
 import { envelope, toolError, toolText } from "../lib/envelope.js";
 
 export const getProcessingTimeSchema = {
@@ -68,7 +69,7 @@ export async function getProcessingTimeHandler(input: unknown) {
             form_types: types,
             offices_for_first_type: offices,
           },
-          "https://egov.uscis.gov/processing-times/api",
+          "https://immigrationtimes.org/api/v1",
         ),
       );
     }
