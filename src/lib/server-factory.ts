@@ -29,12 +29,22 @@ import {
   getProcessingTimeSchema,
   getProcessingTimeHandler,
 } from "../tools/get-processing-time.js";
+import {
+  getPolicyManualTocSchema,
+  getPolicyManualTocHandler,
+} from "../tools/get-policy-manual-toc.js";
+import {
+  getPolicyManualSectionSchema,
+  getPolicyManualSectionHandler,
+} from "../tools/get-policy-manual-section.js";
 
 const TOOLS = [
   searchRegulationsSchema,
   getVisaCategoryRulesSchema,
   getFormRequirementsSchema,
   getProcessingTimeSchema,
+  getPolicyManualTocSchema,
+  getPolicyManualSectionSchema,
 ] as const;
 
 type ToolHandler = (input: unknown) => Promise<CallToolResult>;
@@ -44,6 +54,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_visa_category_rules: getVisaCategoryRulesHandler as ToolHandler,
   get_form_requirements: getFormRequirementsHandler as ToolHandler,
   get_processing_time: getProcessingTimeHandler as ToolHandler,
+  get_policy_manual_toc: getPolicyManualTocHandler as ToolHandler,
+  get_policy_manual_section: getPolicyManualSectionHandler as ToolHandler,
 };
 
 export function createServer(): Server {

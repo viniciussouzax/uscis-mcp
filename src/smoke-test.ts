@@ -9,6 +9,8 @@ import { searchRegulationsHandler } from "./tools/search-regulations.js";
 import { getVisaCategoryRulesHandler } from "./tools/get-visa-category-rules.js";
 import { getFormRequirementsHandler } from "./tools/get-form-requirements.js";
 import { getProcessingTimeHandler } from "./tools/get-processing-time.js";
+import { getPolicyManualTocHandler } from "./tools/get-policy-manual-toc.js";
+import { getPolicyManualSectionHandler } from "./tools/get-policy-manual-section.js";
 
 interface ToolResult {
   isError?: boolean;
@@ -66,6 +68,22 @@ async function main() {
     summarise(
       "get_processing_time (default)",
       (await getProcessingTimeHandler({ form_id: "I-765" })) as ToolResult,
+    ),
+  );
+
+  results.push(
+    summarise(
+      "get_policy_manual_toc",
+      (await getPolicyManualTocHandler({})) as ToolResult,
+    ),
+  );
+
+  results.push(
+    summarise(
+      "get_policy_manual_section",
+      (await getPolicyManualSectionHandler({
+        slug: "volume-1-part-a-chapter-1",
+      })) as ToolResult,
     ),
   );
 
