@@ -12,17 +12,23 @@ import { searchRegulationsSchema, searchRegulationsHandler, } from "../tools/sea
 import { getVisaCategoryRulesSchema, getVisaCategoryRulesHandler, } from "../tools/get-visa-category-rules.js";
 import { getFormRequirementsSchema, getFormRequirementsHandler, } from "../tools/get-form-requirements.js";
 import { getProcessingTimeSchema, getProcessingTimeHandler, } from "../tools/get-processing-time.js";
+import { getPolicyManualTocSchema, getPolicyManualTocHandler, } from "../tools/get-policy-manual-toc.js";
+import { getPolicyManualSectionSchema, getPolicyManualSectionHandler, } from "../tools/get-policy-manual-section.js";
 const TOOLS = [
     searchRegulationsSchema,
     getVisaCategoryRulesSchema,
     getFormRequirementsSchema,
     getProcessingTimeSchema,
+    getPolicyManualTocSchema,
+    getPolicyManualSectionSchema,
 ];
 const HANDLERS = {
     search_regulations: searchRegulationsHandler,
     get_visa_category_rules: getVisaCategoryRulesHandler,
     get_form_requirements: getFormRequirementsHandler,
     get_processing_time: getProcessingTimeHandler,
+    get_policy_manual_toc: getPolicyManualTocHandler,
+    get_policy_manual_section: getPolicyManualSectionHandler,
 };
 export function createServer() {
     const server = new Server({
