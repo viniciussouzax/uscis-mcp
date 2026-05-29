@@ -60,24 +60,30 @@ export async function getPolicyManualToc(): Promise<{
   const $ = cheerio.load(body);
   const volumes: PolicyManualVolume[] = [];
 
-  $("div.toc-tree div.level--2").each((_, volEl) => {
-    const volLink = $(volEl)
-      .find("h2.level__title > a.level__item-link--2")
-      .first();
-    const volTitle = volLink.text().trim();
-    const volHref = volLink.attr("href") ?? "";
-    const volSlug = volHref.replace("/policy-manual/", "");
+  // ul.level--3 (parts) are siblings of div.level--2 (volumes) inside
+  // div.toc-tree, not children — iterate direct children in order.
+  let currentVolume: PolicyManualVolume | null = null;
 
-    if (!volTitle.toLowerCase().startsWith("volume ") || !volSlug) return;
+  $("div.toc-tree").children().each((_, el) => {
+    const $el = $(el);
 
-    const parts: PolicyManualPart[] = [];
+    if ($el.hasClass("level--2")) {
+      if (currentVolume) volumes.push(currentVolume);
+      currentVolume = null;
 
-    $(volEl)
-      .find("li.level__item--3")
-      .each((_, partEl) => {
-        const partLink = $(partEl)
-          .find("> a.level__item-link--3")
-          .first();
+      const volLink = $el.find("h2.level__title > a.level__item-link--2").first();
+      const volTitle = volLink.text().trim();
+      const volHref = volLink.attr("href") ?? "";
+      const volSlug = volHref.replace("/policy-manual/", "");
+
+      if (!volTitle.toLowerCase().startsWith("volume ") || !volSlug) return;
+      currentVolume = { slug: volSlug, title: volTitle, parts: [] };
+      return;
+    }
+
+    if ($el.hasClass("level--3") && currentVolume) {
+      $el.find("li.level__item--3").each((_, partEl) => {
+        const partLink = $(partEl).find("> a.level__item-link--3").first();
         const partTitle = partLink.text().trim();
         const partHref = partLink.attr("href") ?? "";
         const partSlug = partHref.replace("/policy-manual/", "");
@@ -85,7 +91,6 @@ export async function getPolicyManualToc(): Promise<{
         if (!partSlug || !partTitle) return;
 
         const chapters: PolicyManualChapter[] = [];
-
         $(partEl)
           .find("ul.level--4 > li.level__item--4 > a.level__item-link--4")
           .each((_, chapEl) => {
@@ -97,11 +102,12 @@ export async function getPolicyManualToc(): Promise<{
             }
           });
 
-        parts.push({ slug: partSlug, title: partTitle, chapters });
+        currentVolume!.parts.push({ slug: partSlug, title: partTitle, chapters });
       });
-
-    volumes.push({ slug: volSlug, title: volTitle, parts });
+    }
   });
+
+  if (currentVolume) volumes.push(currentVolume);
 
   const payload: PolicyManualToc = {
     volumes,
@@ -150,9 +156,8 @@ export async function getPolicyManualSection(slug: string): Promise<{
   const title =
     $("h1.page-title > span").first().text().trim() || slug;
 
-  const contentRoot = $(
-    "section#book-content > div#guidance > div.tabcontent--guidance > div.field--name-body",
-  );
+  // div#guidance is itself the tabcontent div; the field is its direct child.
+  const contentRoot = $("div#guidance > .field--name-body");
 
   // Strip footnote anchor links, preserving their numeric text
   contentRoot
