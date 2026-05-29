@@ -71,8 +71,10 @@ A successful smoke run looks like this:
 
 ── get_processing_time (list_options) ✓ ──
 ── get_processing_time (default) ✓ ──
+── get_policy_manual_toc ✓ ──
+── get_policy_manual_section ✓ ──
 
-══ 5/5 passed ══
+══ 7/7 passed ══
 ```
 
 If any test fails here, **fix it before deploying** — see [Troubleshooting](#13-troubleshooting).
@@ -476,6 +478,8 @@ The default TTLs match the cadence of the underlying data sources:
 | `get_visa_category_rules` | 6 hours | Same |
 | `get_form_requirements` | 7 days | USCIS form pages change rarely; instructions are versioned by edition |
 | `get_processing_time` | 24 hours | USCIS publishes ~monthly, around the 15th — 24h ensures same-day freshness |
+| `get_policy_manual_toc` | 7 days | Table of contents structure changes only when USCIS adds or reorganises volumes |
+| `get_policy_manual_section` | 7 days | Policy Manual chapters are updated infrequently and versioned by update date |
 
 If you want to change them, edit `src/lib/cache.ts`:
 
@@ -535,6 +539,12 @@ curl -s https://www.uscis.gov/i-130 | head -50
 
 # Processing times
 curl 'https://immigrationtimes.org/api/v1/forms'
+
+# Policy Manual table of contents
+curl -s 'https://www.uscis.gov/policy-manual/table-of-contents' | grep 'level__item-link' | head -20
+
+# Policy Manual chapter
+curl -s 'https://www.uscis.gov/policy-manual/volume-1-part-a-chapter-1' | grep 'field--name-body' | head -5
 ```
 
 Every tool response includes `source_url` — copy it into curl to reproduce.
@@ -617,6 +627,26 @@ If the structure looks different from what the code in `src/sources/immigrationt
 ### Form requirements come back sparse or empty
 
 USCIS.gov may have re-structured its form pages. `src/sources/uscis-forms.ts` uses heading-based heuristics to find sections; adding a new alias to `SECTION_ALIASES` is usually enough to recover.
+
+### Policy Manual TOC returns volumes with empty parts
+
+USCIS may have changed the Drupal template class names used to render the table of contents. Check the raw page:
+
+```bash
+curl -s 'https://www.uscis.gov/policy-manual/table-of-contents' | grep 'level__item'
+```
+
+The selectors in `src/sources/policy-manual.ts` expect `level--2` (volumes), `level--3` (parts), and `level--4` (chapters). If these classes have changed, update `getPolicyManualToc()` accordingly.
+
+### Policy Manual chapter returns empty sections
+
+The content container selector (`div#guidance > .field--name-body`) or the `h2` heading structure may have changed. Verify with:
+
+```bash
+curl -s 'https://www.uscis.gov/policy-manual/volume-1-part-a-chapter-1' | grep 'field--name-body'
+```
+
+If the class is absent, inspect the page source to find the new content container and update `getPolicyManualSection()` in `src/sources/policy-manual.ts`.
 
 ### Cache stays warm with stale data
 

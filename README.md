@@ -1,6 +1,6 @@
 # USCIS MCP Server
 
-A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, and processing-time estimates.
+A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, processing-time estimates, and the full USCIS Policy Manual.
 
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/typescript-5.5-blue.svg)](https://www.typescriptlang.org/)
@@ -10,7 +10,7 @@ A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server t
 
 ## What it does
 
-Plugs into Claude and exposes four tools so the model can answer immigration questions with current, citable data instead of stale training data:
+Plugs into Claude and exposes six tools so the model can answer immigration questions with current, citable data instead of stale training data:
 
 | Tool | Purpose | Source |
 |---|---|---|
@@ -18,6 +18,8 @@ Plugs into Claude and exposes four tools so the model can answer immigration que
 | `get_visa_category_rules` | Full regulatory text by citation (e.g. `8 CFR 214.2(h)`) | eCFR versioner |
 | `get_form_requirements` | "What to file" / "Where to file" / fees for any USCIS form | [USCIS.gov](https://www.uscis.gov) |
 | `get_processing_time` | Current monthly processing estimates by form + office | [immigrationtimes.org](https://immigrationtimes.org) |
+| `get_policy_manual_toc` | Full volume → part → chapter hierarchy of the USCIS Policy Manual | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
+| `get_policy_manual_section` | Policy text for any volume, part, or chapter by slug | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
 
 Every response is wrapped in an envelope containing `source_url` and `fetched_at` so consumers can verify provenance.
 
@@ -26,7 +28,7 @@ Every response is wrapped in an envelope containing `source_url` and `fetched_at
 - **No API key.** All upstream sources are public.
 - **Runs entirely on your machine.** No data leaves your network except the calls to USCIS / eCFR themselves.
 - **Two transports.** Use stdio for Claude Desktop or Streamable HTTP for remote clients. Same tools, your choice.
-- **Cached.** Each upstream is hit only as often as makes sense — daily for processing times, weekly for form pages, hourly for search queries.
+- **Cached.** Each upstream is hit only as often as makes sense — daily for processing times, weekly for form and policy manual pages, hourly for search queries.
 
 ## Quick start
 
@@ -63,7 +65,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The four tools appear in the tool palette automatically.
+Restart Claude Desktop. The six tools appear in the tool palette automatically.
 
 ### For remote clients (HTTP)
 
@@ -128,6 +130,12 @@ Once connected to Claude, you can ask:
 > *"Find regulations about adjustment of status eligibility."*
 > → calls `search_regulations`
 
+> *"What does USCIS policy say about H-1B specialty occupation determinations?"*
+> → calls `get_policy_manual_toc`, then `get_policy_manual_section`
+
+> *"Show me the USCIS Policy Manual chapter on naturalization eligibility."*
+> → calls `get_policy_manual_section`
+
 ## Project layout
 
 ```
@@ -143,20 +151,24 @@ src/
   sources/
     ecfr.ts                # eCFR search + section retrieval
     immigrationtimes.ts    # immigrationtimes.org processing-times client
+    policy-manual.ts       # USCIS Policy Manual TOC + chapter scraper
     uscis-forms.ts         # USCIS.gov form-page scraper (cheerio)
   tools/
     search-regulations.ts
     get-visa-category-rules.ts
     get-form-requirements.ts
     get-processing-time.ts
+    get-policy-manual-toc.ts
+    get-policy-manual-section.ts
 ```
 
 ## Caveats
 
 1. **immigrationtimes.org is an unofficial source.** It aggregates USCIS data but is not operated by the government. If it goes down or changes its API shape, processing-time queries will fail until the source is updated.
-2. **USCIS.gov page structure can drift.** The form-requirements scraper uses heading-based heuristics. If a major redesign ships, you'll get sparser results until selectors are updated — the source URL is always included so the LLM can fall back to fetching the page itself.
-3. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
-4. **Not affiliated with USCIS.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
+2. **USCIS.gov page structure can drift.** Both the form-requirements and policy manual scrapers use CSS class selectors. If USCIS redesigns their Drupal templates, selectors may need updating — the `source_url` is always included so the LLM can fall back to fetching the page directly.
+3. **The Policy Manual is administrative guidance, not regulation.** It reflects USCIS officer practice but can be updated or rescinded without notice. Always cross-reference with the CFR via `get_visa_category_rules`.
+4. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
+5. **Not affiliated with USCIS.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
 
 ## Development
 
