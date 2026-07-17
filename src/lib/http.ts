@@ -64,6 +64,52 @@ export async function httpGet(
   );
 }
 
+/** Like httpGet but returns raw bytes — for PDFs and other binary payloads. */
+export async function httpGetBuffer(
+  url: string,
+  opts: HttpOptions = {},
+): Promise<{ body: Buffer; contentType: string; status: number }> {
+  const { timeoutMs = 30_000, retries = 3, headers = {} } = opts;
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        signal: ac.signal,
+        headers: { "User-Agent": UA, Accept: "*/*", ...headers },
+      });
+
+      clearTimeout(timer);
+
+      if (res.status >= 500 && attempt < retries - 1) {
+        await sleep(backoff(attempt));
+        continue;
+      }
+
+      const body = Buffer.from(await res.arrayBuffer());
+      return {
+        body,
+        contentType: res.headers.get("content-type") ?? "",
+        status: res.status,
+      };
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt < retries - 1) {
+        await sleep(backoff(attempt));
+      }
+    }
+  }
+
+  throw new Error(
+    `httpGetBuffer failed after ${retries} attempts for ${url}: ${String(lastErr)}`,
+  );
+}
+
 export async function httpGetJson<T>(url: string, opts?: HttpOptions): Promise<T> {
   const { body, status } = await httpGet(url, opts);
   if (status >= 400) {
