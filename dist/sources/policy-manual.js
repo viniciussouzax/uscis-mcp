@@ -24,7 +24,9 @@ export async function getPolicyManualToc() {
             if (currentVolume)
                 volumes.push(currentVolume);
             currentVolume = null;
-            const volLink = $el.find("h2.level__title > a.level__item-link--2").first();
+            // USCIS has flipped the title wrapper between <h2> and <div> before —
+            // match on the classes only.
+            const volLink = $el.find(".level__title > a.level__item-link--2").first();
             const volTitle = volLink.text().trim();
             const volHref = volLink.attr("href") ?? "";
             const volSlug = volHref.replace("/policy-manual/", "");
