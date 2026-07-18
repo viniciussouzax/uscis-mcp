@@ -1,6 +1,6 @@
 # USCIS MCP Server
 
-A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, processing-time estimates, and the full USCIS Policy Manual.
+A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server that gives Claude — or any MCP-compatible client — live access to USCIS regulations, form documentation requirements, processing-time estimates, the full USCIS Policy Manual, and precedential Board of Immigration Appeals decisions.
 
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/typescript-5.5-blue.svg)](https://www.typescriptlang.org/)
@@ -10,7 +10,7 @@ A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server t
 
 ## What it does
 
-Plugs into Claude and exposes six tools so the model can answer immigration questions with current, citable data instead of stale training data:
+Plugs into Claude and exposes eight tools so the model can answer immigration questions with current, citable data instead of stale training data:
 
 | Tool | Purpose | Source |
 |---|---|---|
@@ -20,6 +20,8 @@ Plugs into Claude and exposes six tools so the model can answer immigration ques
 | `get_processing_time` | Current monthly processing estimates by form + office | [immigrationtimes.org](https://immigrationtimes.org) |
 | `get_policy_manual_toc` | Full volume → part → chapter hierarchy of the USCIS Policy Manual | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
 | `get_policy_manual_section` | Policy text for any volume, part, or chapter by slug | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
+| `search_bia_decisions` | Search ~3,150 precedential BIA / Attorney General decisions (I&N Dec. vols. 8–present) by case name, citation, or holding | [DOJ EOIR](https://www.justice.gov/eoir/ag-bia-decisions) |
+| `get_bia_decision` | Full text of any precedential decision, extracted from the official PDF | [DOJ EOIR](https://www.justice.gov/eoir/ag-bia-decisions) |
 
 Every response is wrapped in an envelope containing `source_url` and `fetched_at` so consumers can verify provenance.
 
@@ -65,7 +67,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The six tools appear in the tool palette automatically.
+Restart Claude Desktop. The eight tools appear in the tool palette automatically.
 
 ### For remote clients (HTTP)
 
@@ -136,6 +138,12 @@ Once connected to Claude, you can ask:
 > *"Show me the USCIS Policy Manual chapter on naturalization eligibility."*
 > → calls `get_policy_manual_section`
 
+> *"Find BIA precedent on what counts as a crime involving moral turpitude."*
+> → calls `search_bia_decisions`
+
+> *"Give me the full text of Matter of Silva-Trevino, 26 I&N Dec. 550."*
+> → calls `get_bia_decision`
+
 ## Project layout
 
 ```
@@ -150,6 +158,7 @@ src/
     http.ts                # fetch wrapper with retries + backoff
   sources/
     ecfr.ts                # eCFR search + section retrieval
+    eoir.ts                # DOJ EOIR precedential decision scraper + PDF text extraction
     immigrationtimes.ts    # immigrationtimes.org processing-times client
     policy-manual.ts       # USCIS Policy Manual TOC + chapter scraper
     uscis-forms.ts         # USCIS.gov form-page scraper (cheerio)
@@ -160,6 +169,8 @@ src/
     get-processing-time.ts
     get-policy-manual-toc.ts
     get-policy-manual-section.ts
+    search-bia-decisions.ts
+    get-bia-decision.ts
 ```
 
 ## Caveats
@@ -168,7 +179,8 @@ src/
 2. **USCIS.gov page structure can drift.** Both the form-requirements and policy manual scrapers use CSS class selectors. If USCIS redesigns their Drupal templates, selectors may need updating — the `source_url` is always included so the LLM can fall back to fetching the page directly.
 3. **The Policy Manual is administrative guidance, not regulation.** It reflects USCIS officer practice but can be updated or rescinded without notice. Always cross-reference with the CFR via `get_visa_category_rules`.
 4. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
-5. **Not affiliated with USCIS.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
+5. **Only precedential BIA decisions are covered.** DOJ does not systematically publish non-precedential ("unpublished") decisions, so `search_bia_decisions` cannot see them. Holding summaries are only published for volume 19 (1985) onward; earlier decisions are still searchable by case name and citation, and their full text is always retrievable. Decision text is extracted from PDFs and capped at 40,000 characters (a `truncated` flag and the official PDF URL are always included).
+6. **Not affiliated with USCIS or DOJ.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
 
 ## Development
 

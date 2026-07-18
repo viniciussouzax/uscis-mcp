@@ -1,0 +1,348 @@
+<title>USCIS MCP Server — Primary-Source Immigration Research for Claude</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #111111;
+    --ink-soft: #3d3d3d;
+    --ink-faint: #6e6e6e;
+    --rule: #d8d8d8;
+    --rule-strong: #111111;
+    --well: #f5f5f4;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", Times, serif;
+    --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #141414;
+      --ink: #ececec;
+      --ink-soft: #c4c4c4;
+      --ink-faint: #8f8f8f;
+      --rule: #333333;
+      --rule-strong: #ececec;
+      --well: #1d1d1d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #141414;
+    --ink: #ececec;
+    --ink-soft: #c4c4c4;
+    --ink-faint: #8f8f8f;
+    --rule: #333333;
+    --rule-strong: #ececec;
+    --well: #1d1d1d;
+  }
+  :root[data-theme="light"] {
+    --paper: #ffffff;
+    --ink: #111111;
+    --ink-soft: #3d3d3d;
+    --ink-faint: #6e6e6e;
+    --rule: #d8d8d8;
+    --rule-strong: #111111;
+    --well: #f5f5f4;
+  }
+
+  html { background: var(--paper); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 0 1.5rem 6rem;
+  }
+
+  /* ── Masthead ───────────────────────────────────── */
+  header {
+    padding: 4.5rem 0 2.25rem;
+    border-bottom: 3px double var(--rule-strong);
+    text-align: center;
+  }
+  .masthead-label {
+    font-family: var(--sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1.75rem;
+  }
+  h1 {
+    font-size: clamp(2.25rem, 6vw, 3.25rem);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .masthead-sub {
+    font-style: italic;
+    font-size: 1.1875rem;
+    color: var(--ink-soft);
+    max-width: 32em;
+    margin: 0 auto;
+    text-wrap: balance;
+  }
+  .masthead-cite {
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin-top: 1.75rem;
+  }
+  .masthead-cite a { color: inherit; }
+
+  /* ── Sections ───────────────────────────────────── */
+  section { padding-top: 3.25rem; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section-head .mark {
+    font-family: var(--serif);
+    color: var(--ink-faint);
+    font-size: 1rem;
+  }
+  h2 {
+    font-size: 0.8125rem;
+    font-family: var(--sans);
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  em { color: var(--ink-soft); }
+  a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  /* ── Authorities table ──────────────────────────── */
+  .authority { border-bottom: 1px solid var(--rule); padding: 1.375rem 0; }
+  .authority:last-child { border-bottom: 0; }
+  .authority-name {
+    font-size: 1.25rem;
+    font-weight: 400;
+    margin: 0 0 0.25rem;
+  }
+  .authority-source {
+    font-family: var(--sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 0.625rem;
+  }
+  .authority p { font-size: 1rem; color: var(--ink-soft); margin: 0 0 0.75rem; }
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    color: var(--ink-soft);
+  }
+
+  /* ── Envelope figure ────────────────────────────── */
+  pre {
+    background: var(--well);
+    border: 1px solid var(--rule);
+    padding: 1.125rem 1.25rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    margin: 1.25rem 0;
+    color: var(--ink);
+  }
+  code { font-family: var(--mono); font-size: 0.875em; }
+
+  /* ── Example queries ────────────────────────────── */
+  .queries { margin: 0; padding: 0; list-style: none; display: grid; gap: 1.375rem; }
+  .queries blockquote {
+    margin: 0;
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--rule-strong);
+    font-style: italic;
+    font-size: 1.125rem;
+  }
+  .queries .routes {
+    display: block;
+    margin-top: 0.375rem;
+    font-style: normal;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+  }
+
+  /* ── Numbers row ────────────────────────────────── */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border-block: 1px solid var(--rule);
+    margin-top: 0.25rem;
+  }
+  .figure { background: var(--paper); padding: 1.25rem 1rem; text-align: center; }
+  .figure .n {
+    font-size: 1.875rem;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .figure .l {
+    font-family: var(--sans);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ── Notice ─────────────────────────────────────── */
+  .notice {
+    border: 1px solid var(--rule-strong);
+    padding: 1.375rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+  .notice-title {
+    font-family: var(--sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 0.625rem;
+  }
+  .notice p { color: var(--ink-soft); }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 3px double var(--rule-strong);
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  footer a { color: inherit; }
+</style>
+
+<div class="page">
+  <header>
+    <p class="masthead-label">A Model Context Protocol Server</p>
+    <h1>USCIS MCP Server</h1>
+    <p class="masthead-sub">Primary-source immigration research for Claude — regulations, agency policy, and Board precedent, every answer carrying its citation.</p>
+    <p class="masthead-cite">Self-hosted &nbsp;·&nbsp; No API key &nbsp;·&nbsp; MIT License &nbsp;·&nbsp; <a href="https://github.com/sgarcese/uscis-mcp">github.com/sgarcese/uscis-mcp</a></p>
+  </header>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 1</span><h2>The Problem It Answers</h2></div>
+    <p>A language model's recollection of immigration law is a snapshot — and immigration law does not sit still. Processing times move monthly, the Policy Manual is revised without notice, and regulatory text changes under litigation. An attorney cannot cite a model's memory.</p>
+    <p>This server gives Claude live access to the primary sources themselves. When you ask about H-1B specialty-occupation requirements, the model reads the current 8 C.F.R. § 214.2(h) — not its training data. When you ask what the Board has held on moral turpitude, it searches the published precedent. Every response returns the source URL and the timestamp of retrieval, so the authority is always one click away.</p>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 2</span><h2>Authorities Covered</h2></div>
+
+    <div class="authority">
+      <h3 class="authority-name">Regulations — Title 8, Code of Federal Regulations</h3>
+      <p class="authority-source">Official eCFR API · ecfr.gov</p>
+      <p>Full-text search across Title 8 (Aliens and Nationality) and retrieval of complete, current regulatory text by citation — down to the paragraph level.</p>
+      <div class="tools"><span>search_regulations</span><span>get_visa_category_rules</span></div>
+    </div>
+
+    <div class="authority">
+      <h3 class="authority-name">Agency Guidance — USCIS Policy Manual</h3>
+      <p class="authority-source">uscis.gov/policy-manual</p>
+      <p>The complete manual — 12 volumes, 456 chapters — navigable by its own hierarchy and readable chapter by chapter, as adjudicators apply it.</p>
+      <div class="tools"><span>get_policy_manual_toc</span><span>get_policy_manual_section</span></div>
+    </div>
+
+    <div class="authority">
+      <h3 class="authority-name">Precedent — Board of Immigration Appeals</h3>
+      <p class="authority-source">DOJ Executive Office for Immigration Review · justice.gov/eoir</p>
+      <p>Approximately 3,150 precedential BIA and Attorney General decisions, I&amp;N Dec. volumes 8 through the present (1958–). Search by case name, citation, or holding; retrieve the full text of any decision, extracted from the official PDF.</p>
+      <div class="tools"><span>search_bia_decisions</span><span>get_bia_decision</span></div>
+    </div>
+
+    <div class="authority">
+      <h3 class="authority-name">Practice — Forms &amp; Processing Times</h3>
+      <p class="authority-source">uscis.gov · immigrationtimes.org</p>
+      <p>Documentation checklists, filing locations, and fees for any USCIS form, plus current published processing-time estimates by form, sub-type, and service center.</p>
+      <div class="tools"><span>get_form_requirements</span><span>get_processing_time</span></div>
+    </div>
+
+    <div class="figures" role="list">
+      <div class="figure" role="listitem"><span class="n">8</span><span class="l">Tools</span></div>
+      <div class="figure" role="listitem"><span class="n">3,156</span><span class="l">BIA Decisions</span></div>
+      <div class="figure" role="listitem"><span class="n">456</span><span class="l">Manual Chapters</span></div>
+      <div class="figure" role="listitem"><span class="n">1958</span><span class="l">Earliest Precedent</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 3</span><h2>Provenance, Always</h2></div>
+    <p>Every tool response is wrapped in the same envelope: the payload, the exact URL it came from, and when it was fetched. If an upstream source is briefly unreachable and a cached copy is served instead, the envelope says so — the model can reason about staleness rather than conceal it.</p>
+<pre>{
+  "data":       { … },
+  "source_url": "https://www.ecfr.gov/api/…",
+  "fetched_at": "2026-07-17T19:16:36.341Z"
+}</pre>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 4</span><h2>In Practice</h2></div>
+    <ul class="queries">
+      <li><blockquote>"What does 8 CFR 214.2(h) currently say about H-1B specialty occupation requirements?"<span class="routes">→ get_visa_category_rules</span></blockquote></li>
+      <li><blockquote>"Find Board precedent on whether shoplifting is a crime involving moral turpitude."<span class="routes">→ search_bia_decisions</span></blockquote></li>
+      <li><blockquote>"Give me the full text of Matter of Silva-Trevino, 26 I&amp;N Dec. 550."<span class="routes">→ get_bia_decision</span></blockquote></li>
+      <li><blockquote>"What is USCIS currently quoting for an I-485, employment-based?"<span class="routes">→ get_processing_time</span></blockquote></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 5</span><h2>Installation</h2></div>
+    <p>Runs entirely on your own machine — no account, no key, no client data leaving your network beyond the calls to the government sources themselves. Requires Node.js 18 or later.</p>
+<pre>git clone https://github.com/sgarcese/uscis-mcp
+cd uscis-mcp && npm install && npm run build
+npm run smoke   # verifies all 8 tools against live sources</pre>
+    <p>Then register the server in Claude Desktop's <code>claude_desktop_config.json</code>:</p>
+<pre>{
+  "mcpServers": {
+    "uscis": {
+      "command": "node",
+      "args": ["/absolute/path/to/uscis-mcp/dist/index.js"]
+    }
+  }
+}</pre>
+    <p>Restart Claude Desktop and the eight tools appear automatically. For shared or remote deployments — HTTP transport, Docker, systemd, reverse proxy, authentication — see <a href="https://github.com/sgarcese/uscis-mcp/blob/main/DEPLOYMENT.md">DEPLOYMENT.md</a>.</p>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 6</span><h2>Notice</h2></div>
+    <div class="notice">
+      <p class="notice-title">Unofficial · Not Legal Advice</p>
+      <p>This project is not affiliated with, endorsed by, or operated on behalf of USCIS or the Department of Justice. It retrieves publicly published government materials and one unofficial aggregator (processing times). Only precedential BIA decisions are covered; unpublished decisions are not systematically released by DOJ. Verify every authority at its source before relying on it in a filing. Software assists research; it does not practice law.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>USCIS MCP Server · MIT License</span>
+    <span><a href="https://github.com/sgarcese/uscis-mcp">Source on GitHub</a></span>
+  </footer>
+</div>

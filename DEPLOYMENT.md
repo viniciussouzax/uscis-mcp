@@ -27,7 +27,7 @@ This guide covers running the USCIS MCP Server in real environments — from a d
 |---|---|
 | Node.js ≥ 18 | The MCP SDK and the server use modern ESM and `fetch`. Node 18 LTS is the minimum. Node 20 or 22 LTS is recommended. |
 | `npm` (or `pnpm` / `yarn`) | For installing dependencies and running scripts. |
-| Outbound internet on ports 80/443 | The server makes live calls to `www.ecfr.gov`, `www.uscis.gov`, and `immigrationtimes.org`. |
+| Outbound internet on ports 80/443 | The server makes live calls to `www.ecfr.gov`, `www.uscis.gov`, `immigrationtimes.org`, and `www.justice.gov`. |
 | ~150 MB free disk | For `node_modules` and the compiled `dist/`. |
 
 Check your Node version:
@@ -73,8 +73,10 @@ A successful smoke run looks like this:
 ── get_processing_time (default) ✓ ──
 ── get_policy_manual_toc ✓ ──
 ── get_policy_manual_section ✓ ──
+── search_bia_decisions ✓ ──
+── get_bia_decision (by citation) ✓ ──
 
-══ 7/7 passed ══
+══ 9/9 passed ══
 ```
 
 If any test fails here, **fix it before deploying** — see [Troubleshooting](#13-troubleshooting).
@@ -480,6 +482,8 @@ The default TTLs match the cadence of the underlying data sources:
 | `get_processing_time` | 24 hours | USCIS publishes ~monthly, around the 15th — 24h ensures same-day freshness |
 | `get_policy_manual_toc` | 7 days | Table of contents structure changes only when USCIS adds or reorganises volumes |
 | `get_policy_manual_section` | 7 days | Policy Manual chapters are updated infrequently and versioned by update date |
+| `search_bia_decisions` | 7 days (1 day for the current volume) | Closed I&N Dec. volumes never change; only the newest volume gains decisions |
+| `get_bia_decision` | 7 days | Published decision PDFs are immutable; extracted text is cached per decision |
 
 If you want to change them, edit `src/lib/cache.ts`:
 
@@ -545,6 +549,12 @@ curl -s 'https://www.uscis.gov/policy-manual/table-of-contents' | grep 'level__i
 
 # Policy Manual chapter
 curl -s 'https://www.uscis.gov/policy-manual/volume-1-part-a-chapter-1' | grep 'field--name-body' | head -5
+
+# BIA decisions landing page (volume links)
+curl -s 'https://www.justice.gov/eoir/ag-bia-decisions' | grep -oE 'Volume [0-9]+ \(' | head -25
+
+# A BIA volume listing (decision tables)
+curl -s 'https://www.justice.gov/eoir/volume-28' | grep -c 'no-background'
 ```
 
 Every tool response includes `source_url` — copy it into curl to reproduce.
@@ -647,6 +657,24 @@ curl -s 'https://www.uscis.gov/policy-manual/volume-1-part-a-chapter-1' | grep '
 ```
 
 If the class is absent, inspect the page source to find the new content container and update `getPolicyManualSection()` in `src/sources/policy-manual.ts`.
+
+### BIA search returns no or very few decisions
+
+DOJ may have changed the EOIR volume listing markup. The parser in `src/sources/eoir.ts` expects each decision as a two-cell `<tr>` inside a `table.no-background` — case name + citation on the left, an "ID NNNN" (or bare-number) PDF link on the right. Verify with:
+
+```bash
+curl -s 'https://www.justice.gov/eoir/volume-28' | grep -c 'no-background'
+```
+
+Also check that the landing page still lists volumes as `Volume N (…)` links — `getVolumeIndex()` discovers volume URLs from that text.
+
+### get_bia_decision fails to extract text
+
+The PDF may have moved (the tool follows the link published on the volume listing page) or the download returned an HTML error page instead of a PDF — the error message distinguishes the two. Reproduce with the `pdf_url` from the corresponding `search_bia_decisions` result:
+
+```bash
+curl -sI 'https://www.justice.gov/d9/2025-01/4084.pdf' | head -3
+```
 
 ### Cache stays warm with stale data
 
