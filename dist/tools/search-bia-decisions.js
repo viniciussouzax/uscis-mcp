@@ -34,10 +34,11 @@ export const searchBiaDecisionsSchema = {
         required: ["query"],
     },
 };
+// Coerce numerics — clients routinely send integers as JSON strings.
 const Args = z.object({
     query: z.string().min(2),
-    volume: z.number().int().min(1).max(99).optional(),
-    max_results: z.number().int().min(1).max(50).optional(),
+    volume: z.coerce.number().int().min(1).max(99).optional(),
+    max_results: z.coerce.number().int().min(1).max(50).optional(),
 });
 export async function searchBiaDecisionsHandler(input) {
     const parsed = Args.safeParse(input);

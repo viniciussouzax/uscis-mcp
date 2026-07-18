@@ -211,14 +211,16 @@ export async function getBiaDecisionText(query) {
         }
     }
     else if (query.citation) {
-        // Volume prefix ("28 I&N Dec. 883") lets us fetch a single volume page.
-        const volMatch = query.citation.match(/^\s*(\d{1,2})\s+I\s*&\s*N/i);
-        const pageMatch = query.citation.match(/I\s*&\s*N\s*(?:Dec\.?)?\s*(?:at\s+)?(\d+)/i);
-        if (!volMatch || !pageMatch) {
-            throw new Error(`Could not parse citation "${query.citation}". Expected a form like "28 I&N Dec. 883".`);
+        // Accept the citation anywhere in the string, so "Matter of Silva-Trevino,
+        // 26 I&N Dec. 550 (A.G. 2015)" works as well as the bare "26 I&N Dec. 550".
+        // The volume number lets us fetch a single volume page.
+        const citeMatch = query.citation.match(/(\d{1,2})\s*I\s*&\s*N\s*(?:Dec\.?)?\s*(?:at\s+)?(\d+)/i);
+        if (!citeMatch) {
+            throw new Error(`Could not find an I&N Dec. citation in "${query.citation}". ` +
+                `Expected a form like "28 I&N Dec. 883".`);
         }
-        const volume = Number(volMatch[1]);
-        const page = pageMatch[1];
+        const volume = Number(citeMatch[1]);
+        const page = citeMatch[2];
         const { decisions } = await loadDecisions(volume);
         match = decisions.find((d) => new RegExp(`I\\s*&\\s*N\\s*(Dec\\.?)?\\s*${page}(\\D|$)`, "i").test(d.citation));
         if (!match) {

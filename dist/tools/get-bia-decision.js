@@ -17,15 +17,21 @@ export const getBiaDecisionSchema = {
             },
             citation: {
                 type: "string",
-                description: 'I&N Dec. citation, e.g. "28 I&N Dec. 883". Used only if "id" is not given.',
+                description: 'I&N Dec. citation, e.g. "28 I&N Dec. 883". A full case cite like ' +
+                    '"Matter of Silva-Trevino, 26 I&N Dec. 550 (A.G. 2015)" also works. ' +
+                    'Used only if "id" is not given.',
             },
         },
         required: [],
     },
 };
+// Coerce id — clients send it as a bare number as often as a string.
 const Args = z
     .object({
-    id: z.string().regex(/^(ID\s*)?\d{1,5}$/i, "id must be a number like \"4084\"").optional(),
+    id: z.coerce
+        .string()
+        .regex(/^(ID\s*)?\d{1,5}$/i, 'id must be a number like "4084"')
+        .optional(),
     citation: z.string().min(5).optional(),
 })
     .refine((a) => a.id || a.citation, {
