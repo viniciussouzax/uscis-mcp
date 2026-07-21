@@ -146,6 +146,10 @@ Once connected to Claude, you can ask:
 > *"Give me the full text of Matter of Silva-Trevino, 26 I&N Dec. 550."*
 > → calls `get_bia_decision`
 
+## Companion skill: attorney research
+
+[`skills/uscis-attorney-research/`](./skills/uscis-attorney-research/) contains an Agent Skill that layers structured legal-research workflows on top of these tools — RFE/NOID response research, intake and case-strategy screening, precedent research for motions, appeals, and removal defense, policy verification, and pre-filing QA — each with citation-integrity ground rules and a bundled reference on the I-290B motion/appeal framework. Install it alongside the server in any client that supports Agent Skills.
+
 ## Project layout
 
 ```
