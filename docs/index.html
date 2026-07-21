@@ -316,7 +316,13 @@
   </section>
 
   <section>
-    <div class="section-head"><span class="mark">§ 5</span><h2>Installation</h2></div>
+    <div class="section-head"><span class="mark">§ 5</span><h2>Companion Skill: Attorney Research</h2></div>
+    <p>The repository ships an <a href="https://github.com/sgarcese/uscis-mcp/tree/main/skills/uscis-attorney-research">Agent Skill</a>, <code>uscis-attorney-research</code>, that layers structured legal-research workflows for immigration practitioners on top of the server's tools: RFE and NOID response research, client intake and case-strategy screening, precedent research for motions, appeals, and removal defense, policy verification, and pre-filing quality assurance.</p>
+    <p>Each workflow enforces the same discipline — fetch, don't recall; pinpoint citations with source URLs on every claim; explicit notes where a question exceeds the corpus. A bundled reference covers the I-290B motion and appeal framework in depth. Install it alongside the server in any client that supports Agent Skills.</p>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="mark">§ 6</span><h2>Installation</h2></div>
     <p>Runs entirely on your own machine — no account, no key, no client data leaving your network beyond the calls to the government sources themselves. Requires Node.js 18 or later.</p>
 <pre>git clone https://github.com/sgarcese/uscis-mcp
 cd uscis-mcp && npm install && npm run build
@@ -334,7 +340,7 @@ npm run smoke   # verifies all 8 tools against live sources</pre>
   </section>
 
   <section>
-    <div class="section-head"><span class="mark">§ 6</span><h2>Notice</h2></div>
+    <div class="section-head"><span class="mark">§ 7</span><h2>Notice</h2></div>
     <div class="notice">
       <p class="notice-title">Prototype · Unofficial · Not Legal Advice</p>
       <p>This project is a <strong>prototype</strong>, intended to facilitate access to federal information sources for lawyers, advocates, researchers, and others. It is provided as-is, with <strong>no warranty of reliability</strong>, accuracy, or fitness for any purpose.</p>
