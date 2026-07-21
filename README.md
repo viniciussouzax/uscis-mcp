@@ -6,6 +6,8 @@ A self-hosted [Model Context Protocol](https://modelcontextprotocol.io) server t
 [![TypeScript](https://img.shields.io/badge/typescript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](#license)
 
+> **Disclaimer — prototype, no warranty.** This project is a prototype intended to facilitate access to federal information sources for lawyers, advocates, researchers, and others. It is provided as-is, with **no warranty of reliability**, accuracy, or fitness for any purpose. Always verify every authority at its official source before relying on it. Requests for additional functionality should be submitted as [issues on GitHub](https://github.com/sgarcese/uscis-mcp/issues).
+
 ---
 
 ## What it does
@@ -20,7 +22,7 @@ Plugs into Claude and exposes eight tools so the model can answer immigration qu
 | `get_processing_time` | Current monthly processing estimates by form + office | [immigrationtimes.org](https://immigrationtimes.org) |
 | `get_policy_manual_toc` | Full volume → part → chapter hierarchy of the USCIS Policy Manual | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
 | `get_policy_manual_section` | Policy text for any volume, part, or chapter by slug | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
-| `search_bia_decisions` | Search ~3,150 precedential BIA / Attorney General decisions (I&N Dec. vols. 8–present) by case name, citation, or holding | [DOJ EOIR](https://www.justice.gov/eoir/ag-bia-decisions) |
+| `search_bia_decisions` | Search ~3,150 precedential BIA / Attorney General decisions (I&N Dec. vols. 8–present, 1955–) by case name, citation, or holding | [DOJ EOIR](https://www.justice.gov/eoir/ag-bia-decisions) |
 | `get_bia_decision` | Full text of any precedential decision, extracted from the official PDF | [DOJ EOIR](https://www.justice.gov/eoir/ag-bia-decisions) |
 
 Every response is wrapped in an envelope containing `source_url` and `fetched_at` so consumers can verify provenance.
@@ -30,13 +32,13 @@ Every response is wrapped in an envelope containing `source_url` and `fetched_at
 - **No API key.** All upstream sources are public.
 - **Runs entirely on your machine.** No data leaves your network except the calls to USCIS / eCFR themselves.
 - **Two transports.** Use stdio for Claude Desktop or Streamable HTTP for remote clients. Same tools, your choice.
-- **Cached.** Each upstream is hit only as often as makes sense — daily for processing times, weekly for form and policy manual pages, hourly for search queries.
+- **Cached.** Each upstream is hit only as often as makes sense — daily for processing times, weekly for form pages, policy manual pages, and BIA volume indexes, every six hours for regulation searches.
 
 ## Quick start
 
 ```bash
-git clone <this-repo>
-cd uscis-mcp-server
+git clone https://github.com/sgarcese/uscis-mcp
+cd uscis-mcp
 npm install
 npm run build
 
@@ -61,7 +63,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "uscis": {
       "command": "node",
-      "args": ["/absolute/path/to/uscis-mcp-server/dist/index.js"]
+      "args": ["/absolute/path/to/uscis-mcp/dist/index.js"]
     }
   }
 }
@@ -158,6 +160,7 @@ src/
     http.ts                # fetch wrapper with retries + backoff
   sources/
     ecfr.ts                # eCFR search + section retrieval
+    egov.ts                # Official egov.uscis.gov processing-times client (currently unused: blocked by Cloudflare bot detection)
     eoir.ts                # DOJ EOIR precedential decision scraper + PDF text extraction
     immigrationtimes.ts    # immigrationtimes.org processing-times client
     policy-manual.ts       # USCIS Policy Manual TOC + chapter scraper
@@ -192,4 +195,4 @@ npm run smoke        # hit every tool against live endpoints
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).

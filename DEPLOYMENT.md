@@ -44,7 +44,7 @@ These steps are the same for every scenario below.
 
 ```bash
 # 1. Clone & enter the project
-git clone <your-repo-url> uscis-mcp-server
+git clone https://github.com/sgarcese/uscis-mcp uscis-mcp-server
 cd uscis-mcp-server
 
 # 2. Install dependencies
