@@ -14,6 +14,8 @@ import { getFormRequirementsSchema, getFormRequirementsHandler, } from "../tools
 import { getProcessingTimeSchema, getProcessingTimeHandler, } from "../tools/get-processing-time.js";
 import { getPolicyManualTocSchema, getPolicyManualTocHandler, } from "../tools/get-policy-manual-toc.js";
 import { getPolicyManualSectionSchema, getPolicyManualSectionHandler, } from "../tools/get-policy-manual-section.js";
+import { searchBiaDecisionsSchema, searchBiaDecisionsHandler, } from "../tools/search-bia-decisions.js";
+import { getBiaDecisionSchema, getBiaDecisionHandler, } from "../tools/get-bia-decision.js";
 const TOOLS = [
     searchRegulationsSchema,
     getVisaCategoryRulesSchema,
@@ -21,6 +23,8 @@ const TOOLS = [
     getProcessingTimeSchema,
     getPolicyManualTocSchema,
     getPolicyManualSectionSchema,
+    searchBiaDecisionsSchema,
+    getBiaDecisionSchema,
 ];
 const HANDLERS = {
     search_regulations: searchRegulationsHandler,
@@ -29,6 +33,8 @@ const HANDLERS = {
     get_processing_time: getProcessingTimeHandler,
     get_policy_manual_toc: getPolicyManualTocHandler,
     get_policy_manual_section: getPolicyManualSectionHandler,
+    search_bia_decisions: searchBiaDecisionsHandler,
+    get_bia_decision: getBiaDecisionHandler,
 };
 export function createServer() {
     const server = new Server({

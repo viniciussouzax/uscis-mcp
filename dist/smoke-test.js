@@ -11,6 +11,8 @@ import { getFormRequirementsHandler } from "./tools/get-form-requirements.js";
 import { getProcessingTimeHandler } from "./tools/get-processing-time.js";
 import { getPolicyManualTocHandler } from "./tools/get-policy-manual-toc.js";
 import { getPolicyManualSectionHandler } from "./tools/get-policy-manual-section.js";
+import { searchBiaDecisionsHandler } from "./tools/search-bia-decisions.js";
+import { getBiaDecisionHandler } from "./tools/get-bia-decision.js";
 function summarise(label, result) {
     const ok = !result.isError;
     const head = result.content?.[0]?.text?.slice(0, 300) ?? "";
@@ -36,6 +38,13 @@ async function main() {
     results.push(summarise("get_policy_manual_toc", (await getPolicyManualTocHandler({}))));
     results.push(summarise("get_policy_manual_section", (await getPolicyManualSectionHandler({
         slug: "volume-1-part-a-chapter-1",
+    }))));
+    results.push(summarise("search_bia_decisions", (await searchBiaDecisionsHandler({
+        query: "crime involving moral turpitude",
+        max_results: 3,
+    }))));
+    results.push(summarise("get_bia_decision (by citation)", (await getBiaDecisionHandler({
+        citation: "28 I&N Dec. 883",
     }))));
     const passed = results.filter(Boolean).length;
     console.log(`\n══ ${passed}/${results.length} passed ══`);

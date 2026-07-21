@@ -37,6 +37,14 @@ import {
   getPolicyManualSectionSchema,
   getPolicyManualSectionHandler,
 } from "../tools/get-policy-manual-section.js";
+import {
+  searchBiaDecisionsSchema,
+  searchBiaDecisionsHandler,
+} from "../tools/search-bia-decisions.js";
+import {
+  getBiaDecisionSchema,
+  getBiaDecisionHandler,
+} from "../tools/get-bia-decision.js";
 
 const TOOLS = [
   searchRegulationsSchema,
@@ -45,6 +53,8 @@ const TOOLS = [
   getProcessingTimeSchema,
   getPolicyManualTocSchema,
   getPolicyManualSectionSchema,
+  searchBiaDecisionsSchema,
+  getBiaDecisionSchema,
 ] as const;
 
 type ToolHandler = (input: unknown) => Promise<CallToolResult>;
@@ -56,6 +66,8 @@ const HANDLERS: Record<string, ToolHandler> = {
   get_processing_time: getProcessingTimeHandler as ToolHandler,
   get_policy_manual_toc: getPolicyManualTocHandler as ToolHandler,
   get_policy_manual_section: getPolicyManualSectionHandler as ToolHandler,
+  search_bia_decisions: searchBiaDecisionsHandler as ToolHandler,
+  get_bia_decision: getBiaDecisionHandler as ToolHandler,
 };
 
 export function createServer(): Server {
