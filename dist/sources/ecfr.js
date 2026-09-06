@@ -62,12 +62,6 @@ export function parseCitation(citation) {
     };
 }
 /**
- * Cap on returned text, matching the contract eoir.ts already uses for BIA
- * decisions. § 214.2 alone is ~700k characters — roughly 176k tokens — which
- * overflows most context windows if returned whole.
- */
-const MAX_TEXT_CHARS = 40_000;
-/**
  * eCFR titles have a publication lag — using "today" returns 404 when the
  * title hasn't been updated yet. This fetches the actual latest issue date.
  */
@@ -83,7 +77,7 @@ async function getLatestIssueDate(titleNumber) {
     cache.set(cacheKey, date, TTL.ONE_DAY);
     return date;
 }
-export async function getSection(citation) {
+export async function getSection(citation, opts = {}) {
     const { title, part, section, paragraphs } = parseCitation(citation);
     // Use the actual latest published date — eCFR has a multi-day publication
     // lag and returns 404 if you request a date past the latest issue date.
@@ -95,9 +89,12 @@ export async function getSection(citation) {
     // section shares one entry, so the first one fetched is served for all.
     const paragraphKey = paragraphs.length ? paragraphs.join("|") : "whole";
     const cacheKey = `ecfr:section:${title}:${part}:${section ?? "all"}:${paragraphKey}`;
+    // The cache always holds the untruncated text; maxChars is applied to the
+    // copy handed back, so two callers asking with different limits cannot
+    // poison each other's result.
     const cached = cache.get(cacheKey);
     if (cached)
-        return { payload: cached, sourceUrl: url };
+        return { payload: applyLimit(cached, opts.maxChars), sourceUrl: url };
     const { body, status } = await httpGet(url);
     if (status >= 400) {
         throw new Error(`eCFR returned ${status} for ${citation}. Body: ${body.slice(0, 200)}`);
@@ -108,7 +105,6 @@ export async function getSection(citation) {
         section,
         paragraphs,
     });
-    const truncated = text.length > MAX_TEXT_CHARS;
     const payload = {
         citation,
         title_label: `Title ${title}`,
@@ -120,13 +116,19 @@ export async function getSection(citation) {
         paragraph_resolved: resolved.length
             ? resolved.map((p) => `(${p})`).join("")
             : undefined,
-        text: truncated ? text.slice(0, MAX_TEXT_CHARS) : text,
+        text,
         char_count: text.length,
-        truncated,
+        truncated: false,
         effective_date: issueDate,
     };
     cache.set(cacheKey, payload, TTL.SIX_HOURS);
-    return { payload, sourceUrl: url };
+    return { payload: applyLimit(payload, opts.maxChars), sourceUrl: url };
+}
+/** Return a view of `payload` cut to `limit`, or `payload` itself when uncapped. */
+function applyLimit(payload, limit) {
+    if (typeof limit !== "number" || payload.char_count <= limit)
+        return payload;
+    return { ...payload, text: payload.text.slice(0, limit), truncated: true };
 }
 /**
  * Extract a section's text from eCFR XML.

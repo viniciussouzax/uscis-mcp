@@ -125,19 +125,27 @@ export interface SectionContent {
    */
   paragraph_resolved?: string;
   text: string; // plain-text extraction
-  /** Length before truncation. */
+  /** Full length of the extracted text, whether or not it was cut. */
   char_count: number;
-  /** True when `text` holds only the first MAX_TEXT_CHARS characters. */
+  /** True only when the caller passed maxChars and the text exceeded it. */
   truncated: boolean;
   effective_date: string;
 }
 
 /**
- * Cap on returned text, matching the contract eoir.ts already uses for BIA
- * decisions. § 214.2 alone is ~700k characters — roughly 176k tokens — which
- * overflows most context windows if returned whole.
+ * There is no built-in cap. The regulation is returned whole, because a fixed
+ * ceiling cuts the law at an arbitrary point that has nothing to do with what
+ * was asked for — and the honest way to get a smaller answer is a narrower
+ * citation, not a truncated one. Cite the paragraph and the text shrinks by
+ * itself: § 214.2 is ~700k characters, § 214.2(h) is 253k, § 214.2(h)(4) is 31k.
+ *
+ * Callers that genuinely need a ceiling (a small context window, a UI preview)
+ * pass maxChars and get `truncated` back. That is their call to make, not this
+ * module's.
  */
-const MAX_TEXT_CHARS = 40_000;
+export interface GetSectionOptions {
+  maxChars?: number;
+}
 
 /**
  * Fetch the current full text of a CFR section. We use the XML endpoint
@@ -173,6 +181,7 @@ async function getLatestIssueDate(titleNumber: string): Promise<string> {
 
 export async function getSection(
   citation: string,
+  opts: GetSectionOptions = {},
 ): Promise<{ payload: SectionContent; sourceUrl: string }> {
   const { title, part, section, paragraphs } = parseCitation(citation);
 
@@ -189,8 +198,11 @@ export async function getSection(
   // section shares one entry, so the first one fetched is served for all.
   const paragraphKey = paragraphs.length ? paragraphs.join("|") : "whole";
   const cacheKey = `ecfr:section:${title}:${part}:${section ?? "all"}:${paragraphKey}`;
+  // The cache always holds the untruncated text; maxChars is applied to the
+  // copy handed back, so two callers asking with different limits cannot
+  // poison each other's result.
   const cached = cache.get(cacheKey) as SectionContent | null;
-  if (cached) return { payload: cached, sourceUrl: url };
+  if (cached) return { payload: applyLimit(cached, opts.maxChars), sourceUrl: url };
 
   const { body, status } = await httpGet(url);
   if (status >= 400) {
@@ -206,7 +218,6 @@ export async function getSection(
     paragraphs,
   });
 
-  const truncated = text.length > MAX_TEXT_CHARS;
   const payload: SectionContent = {
     citation,
     title_label: `Title ${title}`,
@@ -218,14 +229,23 @@ export async function getSection(
     paragraph_resolved: resolved.length
       ? resolved.map((p) => `(${p})`).join("")
       : undefined,
-    text: truncated ? text.slice(0, MAX_TEXT_CHARS) : text,
+    text,
     char_count: text.length,
-    truncated,
+    truncated: false,
     effective_date: issueDate,
   };
 
   cache.set(cacheKey, payload, TTL.SIX_HOURS);
-  return { payload, sourceUrl: url };
+  return { payload: applyLimit(payload, opts.maxChars), sourceUrl: url };
+}
+
+/** Return a view of `payload` cut to `limit`, or `payload` itself when uncapped. */
+function applyLimit(
+  payload: SectionContent,
+  limit: number | undefined,
+): SectionContent {
+  if (typeof limit !== "number" || payload.char_count <= limit) return payload;
+  return { ...payload, text: payload.text.slice(0, limit), truncated: true };
 }
 
 /**
