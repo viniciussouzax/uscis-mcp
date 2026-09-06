@@ -165,7 +165,7 @@ src/
   sources/
     ecfr.ts                # eCFR search + section retrieval
     uscis-fees.ts          # G-1055 Fee Schedule PDF parser
-    egov.ts                # Official egov.uscis.gov processing-times client (currently unused: blocked by Cloudflare bot detection)
+    egov.ts                # Official egov.uscis.gov processing-times client (dormant: WAF-blocked, see Caveats)
     eoir.ts                # DOJ EOIR precedential decision scraper + PDF text extraction
     immigrationtimes.ts    # immigrationtimes.org processing-times client
     policy-manual.ts       # USCIS Policy Manual TOC + chapter scraper
@@ -183,7 +183,9 @@ src/
 
 ## Caveats
 
-1. **immigrationtimes.org is an unofficial source.** It aggregates USCIS data but is not operated by the government. If it goes down or changes its API shape, processing-time queries will fail until the source is updated.
+1. **Processing times come from an unofficial source, and there is no official one available.** [immigrationtimes.org](https://immigrationtimes.org) aggregates USCIS data but is not operated by the government. If it goes down or changes its API shape, processing-time queries will fail until the source is updated. USCIS's own endpoint at `egov.uscis.gov` sits behind a Cloudflare WAF that rejects non-browser clients — see below — and USCIS's official [Torch developer platform](https://developer.uscis.gov) publishes only a Case Status API and a FOIA API, with no processing-times API as of September 2026. So treat these numbers as indicative, not as a government figure.
+
+   `src/sources/egov.ts` is the dormant client for the official endpoint. It is kept for reference and is imported by nothing. The block is not about IP reputation: from a single IP, Node's `fetch` and `curl` with Chrome headers both get an identical `403 Sorry, you have been blocked`, while a real browser gets an interactive challenge instead. What separates them is the TLS fingerprint (JA3), which a proxy does not change — so residential or rotating proxies would not revive this client. **This project does not attempt to defeat that control**, and the file stays dormant deliberately rather than for lack of a technique.
 2. **Filing fees come from the G-1055 schedule, and are conditional.** The form pages do not publish fees — their "Filing Fee" panel is a fixed 77-character pointer, byte-identical across all 20 forms sampled — so `filing_fee` is read from the official [G-1055 Fee Schedule](https://www.uscis.gov/g-1055) PDF instead. Most forms do not have *a* fee: they have one per circumstance (Form I-485 lists 14; I-765 and I-129 say only "Varies"). Every response carries the schedule's `edition_date`, the parsed `entries`, and the form's block of the schedule verbatim so an amount can be checked against its condition. Never quote a fee without the condition it belongs to — a wrong fee gets the filing rejected.
 3. **USCIS.gov page structure can drift.** Both the form-requirements and policy manual scrapers use CSS class selectors. If USCIS redesigns their Drupal templates, selectors may need updating — the `source_url` is always included so the LLM can fall back to fetching the page directly.
 4. **The Policy Manual is administrative guidance, not regulation.** It reflects USCIS officer practice but can be updated or rescinded without notice. Always cross-reference with the CFR via `get_visa_category_rules`.
