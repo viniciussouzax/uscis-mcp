@@ -192,6 +192,11 @@ function stripFurniture(line: string): string {
   );
 }
 
+/** "i 485", "I485" → "I-485" — the schedule keys blocks by the hyphenated id. */
 function normaliseFormId(input: string): string {
-  return input.trim().toUpperCase().replace(/\s+/g, "");
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/^([A-Z]{1,3})-?(\d)/, "$1-$2");
 }

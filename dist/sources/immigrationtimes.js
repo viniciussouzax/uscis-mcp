@@ -19,8 +19,13 @@ import { httpGetJson } from "../lib/http.js";
 import { cache, TTL } from "../lib/cache.js";
 const BASE = "https://immigrationtimes.org/api/v1";
 // ── Internal helpers ─────────────────────────────────────────────────────────
+/** "I-485", "i 485", "I485" → "i-485" — the hyphen is required by the API. */
 function normaliseSlug(formId) {
-    return formId.trim().toLowerCase().replace(/\s+/g, "");
+    return formId
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/^([a-z]{1,3})-?(\d)/, "$1-$2");
 }
 async function fetchForm(slug) {
     const cacheKey = `imgt:form:${slug}`;

@@ -313,7 +313,17 @@ function matchSection(heading: string): SectionKey | null {
   return null;
 }
 
+/**
+ * "I-485", "i 485", "I485" → "i-485".
+ *
+ * Stripping whitespace alone turned "I 485" into "i485", which 404s. People
+ * and models write the number both ways, and the hyphen is not optional in
+ * the URL.
+ */
 function normaliseSlug(formId: string): string {
-  // "I-485" → "i-485"
-  return formId.trim().toLowerCase().replace(/\s+/g, "");
+  return formId
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/^([a-z]{1,3})-?(\d)/, "$1-$2");
 }
