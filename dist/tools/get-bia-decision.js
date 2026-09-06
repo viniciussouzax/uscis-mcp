@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getBiaDecisionText } from "../sources/eoir.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const getBiaDecisionSchema = {
     name: "get_bia_decision",
     description: "Fetch the full text of a precedential BIA or Attorney General decision " +
@@ -42,12 +43,6 @@ export async function getBiaDecisionHandler(input) {
     if (!parsed.success) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
-    try {
-        const { payload, sourceUrl } = await getBiaDecisionText(parsed.data);
-        return toolText(envelope(payload, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`get_bia_decision failed: ${err.message}`);
-    }
+    return serve("get_bia_decision", parsed.data, () => getBiaDecisionText(parsed.data));
 }
 //# sourceMappingURL=get-bia-decision.js.map

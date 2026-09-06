@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getSection } from "../sources/ecfr.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const getVisaCategoryRulesSchema = {
     name: "get_visa_category_rules",
     description: "Fetch the current regulatory text for a CFR section or paragraph " +
@@ -39,14 +40,6 @@ export async function getVisaCategoryRulesHandler(input) {
     if (!parsed.success) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
-    try {
-        const { payload, sourceUrl } = await getSection(parsed.data.citation, {
-            maxChars: parsed.data.max_chars,
-        });
-        return toolText(envelope(payload, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`get_visa_category_rules failed: ${err.message}`);
-    }
+    return serve("get_visa_category_rules", parsed.data, () => getSection(parsed.data.citation, { maxChars: parsed.data.max_chars }));
 }
 //# sourceMappingURL=get-visa-category-rules.js.map

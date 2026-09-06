@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPolicyManualToc, type PolicyManualToc } from "../sources/policy-manual.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 
 export const getPolicyManualTocSchema = {
   name: "get_policy_manual_toc",
@@ -33,7 +34,7 @@ export async function getPolicyManualTocHandler(input: unknown) {
     return toolError(`Invalid arguments: ${parsed.error.message}`);
   }
 
-  try {
+  return serve("get_policy_manual_toc", parsed.data, async () => {
     const { payload, sourceUrl } = await getPolicyManualToc();
 
     let data: PolicyManualToc = payload;
@@ -52,10 +53,6 @@ export async function getPolicyManualTocHandler(input: unknown) {
       };
     }
 
-    return toolText(envelope(data, sourceUrl));
-  } catch (err) {
-    return toolError(
-      `get_policy_manual_toc failed: ${(err as Error).message}`,
-    );
-  }
+    return { payload: data, sourceUrl };
+  });
 }

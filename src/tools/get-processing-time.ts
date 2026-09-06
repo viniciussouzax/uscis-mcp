@@ -1,7 +1,22 @@
 
 import { z } from "zod";
-import { getProcessingTime, listFormTypes, listOffices } from "../sources/immigrationtimes.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import {
+  getProcessingTime,
+  listFormTypes,
+  listOffices,
+  type FormType,
+  type Office,
+  type ProcessingTimeResult,
+} from "../sources/immigrationtimes.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
+
+/** What list_options returns instead of a processing time. */
+interface ProcessingTimeOptions {
+  form_id: string;
+  form_types: FormType[];
+  offices_for_first_type: Office[];
+}
 
 export const getProcessingTimeSchema = {
   name: "get_processing_time",
@@ -60,33 +75,28 @@ export async function getProcessingTimeHandler(input: unknown) {
   }
   const { form_id, form_type, office_code, list_options } = parsed.data;
 
-  try {
-    if (list_options) {
-      const types = await listFormTypes(form_id);
-      // For the first type, also expose its offices
-      const first = types[0];
-      const offices = first
-        ? await listOffices(form_id, first.form_type_id ?? first.form_type)
-        : [];
-      return toolText(
-        envelope(
-          {
-            form_id,
-            form_types: types,
-            offices_for_first_type: offices,
-          },
-          "https://immigrationtimes.org/api/v1",
-        ),
-      );
-    }
+  return serve<ProcessingTimeResult | ProcessingTimeOptions>(
+    "get_processing_time",
+    parsed.data,
+    async () => {
+      if (list_options) {
+        const types = await listFormTypes(form_id);
+        // For the first type, also expose its offices
+        const first = types[0];
+        const offices = first
+          ? await listOffices(form_id, first.form_type_id ?? first.form_type)
+          : [];
+        return {
+          payload: { form_id, form_types: types, offices_for_first_type: offices },
+          sourceUrl: `https://immigrationtimes.org/api/v1/${form_id.toLowerCase()}.json`,
+        };
+      }
 
-    const { payload, sourceUrl } = await getProcessingTime({
-      formId: form_id,
-      formType: form_type,
-      officeCode: office_code,
-    });
-    return toolText(envelope(payload, sourceUrl));
-  } catch (err) {
-    return toolError(`get_processing_time failed: ${(err as Error).message}`);
-  }
+      return getProcessingTime({
+        formId: form_id,
+        formType: form_type,
+        officeCode: office_code,
+      });
+    },
+  );
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { getProcessingTime, listFormTypes, listOffices } from "../sources/immigrationtimes.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { getProcessingTime, listFormTypes, listOffices, } from "../sources/immigrationtimes.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const getProcessingTimeSchema = {
     name: "get_processing_time",
     description: "Fetch published USCIS processing time estimates for a form. Estimates are " +
@@ -51,7 +52,7 @@ export async function getProcessingTimeHandler(input) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
     const { form_id, form_type, office_code, list_options } = parsed.data;
-    try {
+    return serve("get_processing_time", parsed.data, async () => {
         if (list_options) {
             const types = await listFormTypes(form_id);
             // For the first type, also expose its offices
@@ -59,21 +60,16 @@ export async function getProcessingTimeHandler(input) {
             const offices = first
                 ? await listOffices(form_id, first.form_type_id ?? first.form_type)
                 : [];
-            return toolText(envelope({
-                form_id,
-                form_types: types,
-                offices_for_first_type: offices,
-            }, "https://immigrationtimes.org/api/v1"));
+            return {
+                payload: { form_id, form_types: types, offices_for_first_type: offices },
+                sourceUrl: `https://immigrationtimes.org/api/v1/${form_id.toLowerCase()}.json`,
+            };
         }
-        const { payload, sourceUrl } = await getProcessingTime({
+        return getProcessingTime({
             formId: form_id,
             formType: form_type,
             officeCode: office_code,
         });
-        return toolText(envelope(payload, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`get_processing_time failed: ${err.message}`);
-    }
+    });
 }
 //# sourceMappingURL=get-processing-time.js.map
