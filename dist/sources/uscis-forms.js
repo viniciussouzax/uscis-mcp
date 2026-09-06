@@ -21,6 +21,7 @@
  */
 import * as cheerio from "cheerio";
 import { httpGet } from "../lib/http.js";
+import { FEE_SCHEDULE_URL, getFormFees, } from "./uscis-fees.js";
 import { cache, TTL } from "../lib/cache.js";
 /**
  * Matched against the accordion header text, lowercased. First alias that
@@ -76,6 +77,17 @@ export async function getFormRequirements(formId) {
         if (full && full.length > (payload.sections.what_to_file?.length ?? 0)) {
             payload.sections.what_to_file = full;
         }
+    }
+    // Fees come from the G-1055 schedule, not from this page. A failure there
+    // must not sink the rest of the lookup, so it degrades to null.
+    try {
+        const { payload: fees, sourceUrl: feeUrl } = await getFormFees(formId);
+        payload.filing_fee = fees;
+        payload.fee_source_url = feeUrl;
+    }
+    catch {
+        payload.filing_fee = null;
+        payload.fee_source_url = FEE_SCHEDULE_URL;
     }
     applyCaps(payload);
     cache.set(cacheKey, payload, TTL.SEVEN_DAYS);
