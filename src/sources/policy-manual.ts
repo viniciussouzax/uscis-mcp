@@ -6,6 +6,9 @@ const BASE_URL = "https://www.uscis.gov/policy-manual";
 const TOC_URL = `${BASE_URL}/table-of-contents`;
 const TOC_CACHE_KEY = "policy-manual:toc";
 
+/** What `$(...)` hands back — a selection of DOM elements. */
+type Selection = ReturnType<cheerio.CheerioAPI>;
+
 export const SLUG_REGEX = /^volume-(\d{1,2})(-part-([a-z])(-chapter-(\d+))?)?$/;
 
 export interface PolicyManualChapter {
@@ -171,6 +174,21 @@ export async function getPolicyManualSection(slug: string): Promise<{
   const sections: PolicyManualSection[] = [];
   const fullTextParts: string[] = [];
 
+  // Everything before the first h2 belongs to the chapter too. Walking only
+  // h2-and-after silently drops it — and on many chapters that is the whole
+  // body. 6 USCIS-PM E.2, for instance, holds its intro, its EB-1/EB-2/EB-3
+  // list and its eligibility table before the single h2 on the page, which is
+  // "Footnotes"; without this the chapter comes back as footnotes alone.
+  const firstH2 = contentRoot.find("h2").first();
+  if (firstH2.length) {
+    const preamble = textBefore($, contentRoot, firstH2);
+    if (preamble) {
+      const text = preamble.slice(0, 5000);
+      sections.push({ id: "", heading: "Introduction", text });
+      fullTextParts.push(`## Introduction\n\n${text}`);
+    }
+  }
+
   contentRoot.find("h2").each((_, h2El) => {
     const sectionId =
       $(h2El).find("a.ck-anchor[id]").first().attr("id") ?? "";
@@ -189,7 +207,9 @@ export async function getPolicyManualSection(slug: string): Promise<{
     fullTextParts.push(`## ${heading}\n\n${text}`);
   });
 
-  // Fallback for pages with no h2 sections (volume/part index pages)
+  // Fallback for pages with no h2 at all (volume/part index pages). Note this
+  // never fired for the case above: a chapter whose only h2 is "Footnotes"
+  // still counts as one section, so the count was never zero.
   if (sections.length === 0) {
     const fallback = contentRoot
       .text()
@@ -211,4 +231,33 @@ export async function getPolicyManualSection(slug: string): Promise<{
 
   cache.set(cacheKey, payload, TTL.SEVEN_DAYS);
   return { payload, sourceUrl };
+}
+
+/**
+ * Text of everything that precedes `stop` inside `root`, in document order.
+ *
+ * Climbs from `stop` up to `root`, taking each level's earlier siblings, so it
+ * works whether the heading sits directly under the content root or nested in
+ * a wrapper.
+ */
+function textBefore(
+  $: cheerio.CheerioAPI,
+  root: Selection,
+  stop: Selection,
+): string {
+  const parts: string[] = [];
+  let node: Selection = stop;
+
+  while (node.length && !node.is(root)) {
+    const level = node
+      .prevAll()
+      .toArray()
+      .reverse()
+      .map((el) => $(el).text().replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    parts.unshift(...level);
+    node = node.parent();
+  }
+
+  return parts.join("\n\n").trim();
 }
