@@ -6,8 +6,13 @@ export const getFormRequirementsSchema = {
   name: "get_form_requirements",
   description:
     "Retrieve the documentation checklist and filing instructions for a USCIS " +
-    'form by parsing the official USCIS.gov form page. Returns "what to file", ' +
-    '"where to file", "filing fees", and "special instructions" sections.',
+    "form by parsing the official USCIS.gov form page. Returns, when the page " +
+    "publishes them: what_to_file (the Checklist of Required Initial Evidence, " +
+    "followed to its standalone page when USCIS hosts it there), where_to_file, " +
+    "when_to_file, filing_fees, form_filing_tips, special_instructions and " +
+    "forms_and_documents. Note that filing_fees is only a pointer to the USCIS " +
+    "Fee Schedule (form G-1055) — USCIS does not publish the amount on the form " +
+    "page, so never quote a fee from this tool.",
   inputSchema: {
     type: "object",
     properties: {
