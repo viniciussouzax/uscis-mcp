@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { searchRegulations } from "../sources/ecfr.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
-import { cache } from "../lib/cache.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 
 export const searchRegulationsSchema = {
   name: "search_regulations",
@@ -47,39 +47,28 @@ export async function searchRegulationsHandler(input: unknown) {
   }
   const { query, max_results, cfr_part } = parsed.data;
 
-  try {
+  return serve("search_regulations", parsed.data, async () => {
     const { payload, sourceUrl } = await searchRegulations({
       query,
       maxResults: max_results,
       cfrPart: cfr_part,
     });
 
-    // Trim noisy fields before returning
-    const slim = {
-      total_count: payload.meta.total_count,
-      page: payload.meta.current_page,
-      results: payload.results.map((r) => ({
-        hierarchy: r.hierarchy,
-        headings: r.headings,
-        excerpt: r.full_text_excerpt,
-        score: r.score,
-      })),
+    // Trim noisy fields before returning. This slimmed shape is what gets
+    // cached for the stale path too, so a stale answer has the same schema as
+    // a fresh one — it used to cache the raw eCFR response and return this.
+    return {
+      payload: {
+        total_count: payload.meta.total_count,
+        page: payload.meta.current_page,
+        results: payload.results.map((r) => ({
+          hierarchy: r.hierarchy,
+          headings: r.headings,
+          excerpt: r.full_text_excerpt,
+          score: r.score,
+        })),
+      },
+      sourceUrl,
     };
-
-    return toolText(envelope(slim, sourceUrl));
-  } catch (err) {
-    // Stale fallback
-    const staleKey = `ecfr:search:${query}:${max_results ?? 10}:${cfr_part ?? ""}`;
-    const stale = cache.getStale(staleKey);
-    if (stale) {
-      return toolText(
-        envelope(stale.value, "cached", {
-          stale: true,
-          staleReason: `upstream_unavailable: ${(err as Error).message}`,
-          ageSeconds: Math.floor(stale.ageMs / 1000),
-        }),
-      );
-    }
-    return toolError(`search_regulations failed: ${(err as Error).message}`);
-  }
+  });
 }

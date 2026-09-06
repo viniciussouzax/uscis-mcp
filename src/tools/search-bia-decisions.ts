@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchBiaDecisions } from "../sources/eoir.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 
 export const searchBiaDecisionsSchema = {
   name: "search_bia_decisions",
@@ -52,13 +53,10 @@ export async function searchBiaDecisionsHandler(input: unknown) {
     return toolError(`Invalid arguments: ${parsed.error.message}`);
   }
 
-  try {
-    const { payload, sourceUrl } = await searchBiaDecisions(parsed.data.query, {
+  return serve("search_bia_decisions", parsed.data, () =>
+    searchBiaDecisions(parsed.data.query, {
       volume: parsed.data.volume,
       maxResults: parsed.data.max_results,
-    });
-    return toolText(envelope(payload, sourceUrl));
-  } catch (err) {
-    return toolError(`search_bia_decisions failed: ${(err as Error).message}`);
-  }
+    }),
+  );
 }

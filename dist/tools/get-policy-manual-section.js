@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPolicyManualSection, SLUG_REGEX } from "../sources/policy-manual.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const getPolicyManualSectionSchema = {
     name: "get_policy_manual_section",
     description: "Fetch the policy text of a USCIS Policy Manual volume, part, or chapter " +
@@ -31,12 +32,6 @@ export async function getPolicyManualSectionHandler(input) {
     if (!parsed.success) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
-    try {
-        const { payload, sourceUrl } = await getPolicyManualSection(parsed.data.slug);
-        return toolText(envelope(payload, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`get_policy_manual_section failed: ${err.message}`);
-    }
+    return serve("get_policy_manual_section", parsed.data, () => getPolicyManualSection(parsed.data.slug));
 }
 //# sourceMappingURL=get-policy-manual-section.js.map

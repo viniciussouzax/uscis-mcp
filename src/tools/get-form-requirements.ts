@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getFormRequirements } from "../sources/uscis-forms.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 
 export const getFormRequirementsSchema = {
   name: "get_form_requirements",
@@ -37,12 +38,7 @@ export async function getFormRequirementsHandler(input: unknown) {
     return toolError(`Invalid arguments: ${parsed.error.message}`);
   }
 
-  try {
-    const { payload, sourceUrl } = await getFormRequirements(parsed.data.form_id);
-    return toolText(envelope(payload, sourceUrl));
-  } catch (err) {
-    return toolError(
-      `get_form_requirements failed: ${(err as Error).message}`,
-    );
-  }
+  return serve("get_form_requirements", parsed.data, () =>
+    getFormRequirements(parsed.data.form_id),
+  );
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchBiaDecisions } from "../sources/eoir.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const searchBiaDecisionsSchema = {
     name: "search_bia_decisions",
     description: "Search precedential Board of Immigration Appeals (BIA) and Attorney " +
@@ -45,15 +46,9 @@ export async function searchBiaDecisionsHandler(input) {
     if (!parsed.success) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
-    try {
-        const { payload, sourceUrl } = await searchBiaDecisions(parsed.data.query, {
-            volume: parsed.data.volume,
-            maxResults: parsed.data.max_results,
-        });
-        return toolText(envelope(payload, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`search_bia_decisions failed: ${err.message}`);
-    }
+    return serve("search_bia_decisions", parsed.data, () => searchBiaDecisions(parsed.data.query, {
+        volume: parsed.data.volume,
+        maxResults: parsed.data.max_results,
+    }));
 }
 //# sourceMappingURL=search-bia-decisions.js.map

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPolicyManualToc } from "../sources/policy-manual.js";
-import { envelope, toolError, toolText } from "../lib/envelope.js";
+import { toolError } from "../lib/envelope.js";
+import { serve } from "../lib/serve.js";
 export const getPolicyManualTocSchema = {
     name: "get_policy_manual_toc",
     description: "Retrieve the table of contents for the USCIS Policy Manual. " +
@@ -27,7 +28,7 @@ export async function getPolicyManualTocHandler(input) {
     if (!parsed.success) {
         return toolError(`Invalid arguments: ${parsed.error.message}`);
     }
-    try {
+    return serve("get_policy_manual_toc", parsed.data, async () => {
         const { payload, sourceUrl } = await getPolicyManualToc();
         let data = payload;
         if (parsed.data.volume) {
@@ -40,10 +41,7 @@ export async function getPolicyManualTocHandler(input) {
                 total_chapters: filtered.reduce((n, v) => n + v.parts.reduce((m, p) => m + p.chapters.length, 0), 0),
             };
         }
-        return toolText(envelope(data, sourceUrl));
-    }
-    catch (err) {
-        return toolError(`get_policy_manual_toc failed: ${err.message}`);
-    }
+        return { payload: data, sourceUrl };
+    });
 }
 //# sourceMappingURL=get-policy-manual-toc.js.map
