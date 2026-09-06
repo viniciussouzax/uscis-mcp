@@ -10,9 +10,12 @@ export const getFormRequirementsSchema = {
     "publishes them: what_to_file (the Checklist of Required Initial Evidence, " +
     "followed to its standalone page when USCIS hosts it there), where_to_file, " +
     "when_to_file, filing_fees, form_filing_tips, special_instructions and " +
-    "forms_and_documents. Note that filing_fees is only a pointer to the USCIS " +
-    "Fee Schedule (form G-1055) — USCIS does not publish the amount on the form " +
-    "page, so never quote a fee from this tool.",
+    "forms_and_documents. Fees come separately in filing_fee, read from the " +
+    "official G-1055 Fee Schedule, since the form page itself only links to it. " +
+    "Most forms have no single fee but one per circumstance — I-485 lists 14, " +
+    "and I-765 and I-129 say only \"Varies\" — so match the condition before " +
+    "quoting an amount, give the edition_date with it, and point to " +
+    "fee_source_url. A wrong fee gets the filing rejected.",
   inputSchema: {
     type: "object",
     properties: {

@@ -25,6 +25,11 @@ import type { CheerioAPI } from "cheerio";
 /** What `$()` accepts: a raw node or an existing Cheerio selection. */
 type Selectable = Parameters<CheerioAPI>[0];
 import { httpGet } from "../lib/http.js";
+import {
+  FEE_SCHEDULE_URL,
+  getFormFees,
+  type FormFees,
+} from "./uscis-fees.js";
 import { cache, TTL } from "../lib/cache.js";
 
 export interface FormRequirements {
@@ -42,6 +47,13 @@ export interface FormRequirements {
   };
   /** Set when the checklist lives on its own page and we followed the link. */
   checklist_url?: string;
+  /**
+   * Fees from the official G-1055 schedule. Null when the schedule has no block
+   * for this form, or when fetching it failed — never a guess, and never a
+   * number lifted from the form page, which does not publish one.
+   */
+  filing_fee?: FormFees | null;
+  fee_source_url?: string;
   /** Sections cut by MAX_SECTION_CHARS — never truncate silently. */
   truncated_sections?: Array<{ section: string; returned: number; total: number }>;
   raw_text_length: number;
@@ -112,6 +124,17 @@ export async function getFormRequirements(
     if (full && full.length > (payload.sections.what_to_file?.length ?? 0)) {
       payload.sections.what_to_file = full;
     }
+  }
+
+  // Fees come from the G-1055 schedule, not from this page. A failure there
+  // must not sink the rest of the lookup, so it degrades to null.
+  try {
+    const { payload: fees, sourceUrl: feeUrl } = await getFormFees(formId);
+    payload.filing_fee = fees;
+    payload.fee_source_url = feeUrl;
+  } catch {
+    payload.filing_fee = null;
+    payload.fee_source_url = FEE_SCHEDULE_URL;
   }
 
   applyCaps(payload);
