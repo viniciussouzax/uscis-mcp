@@ -155,12 +155,14 @@ function extractSectionFromXml(xml, ref) {
             resolved.push(designator);
         }
     }
-    // Strip tags but keep paragraph breaks
-    const text = chunk
+    // Strip tags but keep paragraph breaks. Entities are decoded last, after the
+    // markup is gone, so an escaped "&lt;P&gt;" in the regulation's own prose is
+    // never mistaken for a tag to strip.
+    const text = decodeEntities(chunk
         .replace(/<HEAD>([\s\S]*?)<\/HEAD>/gi, "\n\n## $1\n\n")
         .replace(/<P>/gi, "\n\n")
         .replace(/<\/P>/gi, "")
-        .replace(/<[^>]+>/g, "")
+        .replace(/<[^>]+>/g, ""))
         .replace(/\n{3,}/g, "\n\n")
         .replace(/[ \t]+/g, " ")
         .trim();
@@ -171,6 +173,58 @@ function extractSectionFromXml(xml, ref) {
         };
     }
     return { text, resolved };
+}
+const NAMED_ENTITIES = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    nbsp: " ",
+    mdash: "—",
+    ndash: "–",
+    sect: "§",
+    para: "¶",
+    ldquo: "“",
+    rdquo: "”",
+    lsquo: "‘",
+    rsquo: "’",
+    hellip: "…",
+    deg: "°",
+};
+/**
+ * Decode XML character references. eCFR encodes ordinary punctuation this way —
+ * an em dash is `&#x2014;`, a section sign `&#xA7;`, curly quotes `&#x201C;`
+ * and `&#x201D;` — and the text used to carry them through verbatim, so
+ * "214.2(l) Intracompany transferees&#x2014;(1)" is what a reader saw.
+ *
+ * One pass over all forms at once. Decoding `&amp;` in a separate later pass
+ * would turn a literal "&amp;#x2014;" into an em dash it was never meant to be.
+ */
+function decodeEntities(text) {
+    return text.replace(/&(?:#x([0-9a-fA-F]{1,6})|#(\d{1,7})|([a-zA-Z][a-zA-Z0-9]{1,9}));/g, (match, hex, dec, name) => {
+        if (hex !== undefined)
+            return safeCodePoint(parseInt(hex, 16), match);
+        if (dec !== undefined)
+            return safeCodePoint(parseInt(dec, 10), match);
+        if (name !== undefined)
+            return NAMED_ENTITIES[name.toLowerCase()] ?? match;
+        return match;
+    });
+}
+/** Leave anything out of range untouched rather than throwing on bad input. */
+function safeCodePoint(code, fallback) {
+    if (!Number.isFinite(code) || code < 0 || code > 0x10ffff)
+        return fallback;
+    // Lone surrogates are not valid scalar values.
+    if (code >= 0xd800 && code <= 0xdfff)
+        return fallback;
+    try {
+        return String.fromCodePoint(code);
+    }
+    catch {
+        return fallback;
+    }
 }
 const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
 const ROMANS = [
