@@ -4,6 +4,12 @@ import { cache, TTL } from "../lib/cache.js";
 const BASE_URL = "https://www.uscis.gov/policy-manual";
 const TOC_URL = `${BASE_URL}/table-of-contents`;
 const TOC_CACHE_KEY = "policy-manual:toc";
+/**
+ * Per-section cap. Sections longer than this are cut — but never in silence:
+ * each one reports `char_count` and `truncated`, the same contract eoir.ts
+ * already uses for BIA decisions, and full_text carries a visible marker.
+ */
+const MAX_SECTION_CHARS = 5_000;
 export const SLUG_REGEX = /^volume-(\d{1,2})(-part-([a-z])(-chapter-(\d+))?)?$/;
 export async function getPolicyManualToc() {
     const cached = cache.get(TOC_CACHE_KEY);
@@ -108,9 +114,9 @@ export async function getPolicyManualSection(slug) {
     if (firstH2.length) {
         const preamble = textBefore($, contentRoot, firstH2);
         if (preamble) {
-            const text = preamble.slice(0, 5000);
-            sections.push({ id: "", heading: "Introduction", text });
-            fullTextParts.push(`## Introduction\n\n${text}`);
+            const section = makeSection("", "Introduction", preamble);
+            sections.push(section);
+            fullTextParts.push(renderSection(section));
         }
     }
     contentRoot.find("h2").each((_, h2El) => {
@@ -124,22 +130,19 @@ export async function getPolicyManualSection(slug) {
                 textParts.push(t);
             cursor = cursor.next();
         }
-        const text = textParts.join("\n\n").slice(0, 5000);
-        sections.push({ id: sectionId, heading, text });
-        fullTextParts.push(`## ${heading}\n\n${text}`);
+        const section = makeSection(sectionId, heading, textParts.join("\n\n"));
+        sections.push(section);
+        fullTextParts.push(renderSection(section));
     });
     // Fallback for pages with no h2 at all (volume/part index pages). Note this
     // never fired for the case above: a chapter whose only h2 is "Footnotes"
     // still counts as one section, so the count was never zero.
     if (sections.length === 0) {
-        const fallback = contentRoot
-            .text()
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 5000);
+        const fallback = contentRoot.text().replace(/\s+/g, " ").trim();
         if (fallback) {
-            sections.push({ id: "", heading: title, text: fallback });
-            fullTextParts.push(fallback);
+            const section = makeSection("", title, fallback);
+            sections.push(section);
+            fullTextParts.push(section.text + truncationNote(section));
         }
     }
     const payload = {
@@ -147,9 +150,39 @@ export async function getPolicyManualSection(slug) {
         title,
         sections,
         full_text: fullTextParts.join("\n\n"),
+        truncated: sections.some((s) => s.truncated),
     };
     cache.set(cacheKey, payload, TTL.SEVEN_DAYS);
     return { payload, sourceUrl };
+}
+function makeSection(id, heading, text) {
+    const truncated = text.length > MAX_SECTION_CHARS;
+    return {
+        id,
+        heading,
+        text: truncated ? text.slice(0, MAX_SECTION_CHARS) : text,
+        char_count: text.length,
+        truncated,
+    };
+}
+function renderSection(section) {
+    return `## ${section.heading}
+
+${section.text}${truncationNote(section)}`;
+}
+/**
+ * A marker inside the text itself, not only in the metadata. A model reading
+ * full_text has no other way to know the passage stops early — and answering
+ * from a fraction of a chapter without knowing it is the actual risk here.
+ */
+function truncationNote(section) {
+    if (!section.truncated)
+        return "";
+    return (`
+
+[truncated: showing ${MAX_SECTION_CHARS.toLocaleString("en-US")} of ` +
+        `${section.char_count.toLocaleString("en-US")} characters in this section — ` +
+        `see source_url for the full text]`);
 }
 /**
  * Text of everything that precedes `stop` inside `root`, in document order.
