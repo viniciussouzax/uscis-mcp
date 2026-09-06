@@ -114,8 +114,13 @@ export interface ProcessingTimeResult {
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
+/** "I-485", "i 485", "I485" → "i-485" — the hyphen is required by the API. */
 function normaliseSlug(formId: string): string {
-  return formId.trim().toLowerCase().replace(/\s+/g, "");
+  return formId
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/^([a-z]{1,3})-?(\d)/, "$1-$2");
 }
 
 async function fetchForm(slug: string): Promise<ImmigrationTimesForm> {
