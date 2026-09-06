@@ -18,7 +18,7 @@ Plugs into Claude and exposes eight tools so the model can answer immigration qu
 |---|---|---|
 | `search_regulations` | Full-text search of Title 8 CFR (Aliens and Nationality) | [eCFR API](https://www.ecfr.gov) |
 | `get_visa_category_rules` | Full regulatory text by citation (e.g. `8 CFR 214.2(h)`) | eCFR versioner |
-| `get_form_requirements` | "What to file" / "Where to file" / fees for any USCIS form | [USCIS.gov](https://www.uscis.gov) |
+| `get_form_requirements` | Checklist of required initial evidence, where/when to file, filing tips and special instructions for any USCIS form | [USCIS.gov](https://www.uscis.gov) |
 | `get_processing_time` | Current monthly processing estimates by form + office | [immigrationtimes.org](https://immigrationtimes.org) |
 | `get_policy_manual_toc` | Full volume → part → chapter hierarchy of the USCIS Policy Manual | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
 | `get_policy_manual_section` | Policy text for any volume, part, or chapter by slug | [USCIS Policy Manual](https://www.uscis.gov/policy-manual) |
@@ -183,11 +183,12 @@ src/
 ## Caveats
 
 1. **immigrationtimes.org is an unofficial source.** It aggregates USCIS data but is not operated by the government. If it goes down or changes its API shape, processing-time queries will fail until the source is updated.
-2. **USCIS.gov page structure can drift.** Both the form-requirements and policy manual scrapers use CSS class selectors. If USCIS redesigns their Drupal templates, selectors may need updating — the `source_url` is always included so the LLM can fall back to fetching the page directly.
-3. **The Policy Manual is administrative guidance, not regulation.** It reflects USCIS officer practice but can be updated or rescinded without notice. Always cross-reference with the CFR via `get_visa_category_rules`.
-4. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
-5. **Only precedential BIA decisions are covered.** DOJ does not systematically publish non-precedential ("unpublished") decisions, so `search_bia_decisions` cannot see them. Holding summaries are only published for volume 19 (1985) onward; earlier decisions are still searchable by case name and citation, and their full text is always retrievable. Decision text is extracted from PDFs and capped at 40,000 characters (a `truncated` flag and the official PDF URL are always included).
-6. **Not affiliated with USCIS or DOJ.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
+2. **`get_form_requirements` does not return filing fees.** The README used to promise them; the form pages do not publish them. The "Filing Fee" panel is a fixed 77-character pointer — *"You can find the filing fee for Form X by visiting our Fee Schedule page"* — identical across all 20 forms sampled. The tool returns that pointer and the link to the [G-1055 fee schedule](https://www.uscis.gov/g-1055); it never invents an amount. Scraping G-1055 would be a separate source, and fees are the single field where a stale value gets a filing rejected, so it is deliberately not done here.
+3. **USCIS.gov page structure can drift.** Both the form-requirements and policy manual scrapers use CSS class selectors. If USCIS redesigns their Drupal templates, selectors may need updating — the `source_url` is always included so the LLM can fall back to fetching the page directly.
+4. **The Policy Manual is administrative guidance, not regulation.** It reflects USCIS officer practice but can be updated or rescinded without notice. Always cross-reference with the CFR via `get_visa_category_rules`.
+5. **Regulations are extremely volatile in 2026.** Always trust `source_url` and `fetched_at` over an LLM's training-data recollection.
+6. **Only precedential BIA decisions are covered.** DOJ does not systematically publish non-precedential ("unpublished") decisions, so `search_bia_decisions` cannot see them. Holding summaries are only published for volume 19 (1985) onward; earlier decisions are still searchable by case name and citation, and their full text is always retrievable. Decision text is extracted from PDFs and capped at 40,000 characters (a `truncated` flag and the official PDF URL are always included).
+7. **Not affiliated with USCIS or DOJ.** This is an unofficial wrapper around public endpoints. Do not rely on it for legal decisions.
 
 ## Development
 
