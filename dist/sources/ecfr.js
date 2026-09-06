@@ -36,24 +36,37 @@ export async function searchRegulations(args) {
 }
 // ── Section retrieval ────────────────────────────────────────────────────────
 /**
- * Parse a citation like "8 CFR 214.2(h)" into the bits eCFR needs.
- * Returns { title, part, section } — we ignore paragraph for now since
- * the versioner returns whole sections anyway.
+ * Parse a citation like "8 CFR 214.2(h)(4)" into the bits eCFR needs.
+ *
+ * The paragraph designators used to be dropped here, which meant
+ * "8 CFR 214.2(h)" and "8 CFR 214.2" returned byte-identical text — asking
+ * for the H-1B rules handed back all of § 214.2, every nonimmigrant class
+ * from A to V.
  */
 export function parseCitation(citation) {
     // Accept: "8 CFR 214.2", "8 CFR 214.2(h)", "8 CFR 214", "8 CFR §214.2"
     const cleaned = citation.replace(/§/g, "").replace(/\s+/g, " ").trim();
-    const m = cleaned.match(/^(\d+)\s*CFR\s*(\d+)(?:\.(\d+))?/i);
+    const m = cleaned.match(/^(\d+)\s*CFR\s*(\d+)(?:\.(\d+))?((?:\([A-Za-z0-9]{1,5}\))*)/i);
     if (!m) {
         throw new Error(`Could not parse CFR citation "${citation}". Expected format like "8 CFR 214.2".`);
     }
-    const [, title, part, sectionNum] = m;
+    const [, title, part, sectionNum, paragraphTail] = m;
+    const paragraphs = sectionNum
+        ? [...(paragraphTail ?? "").matchAll(/\(([A-Za-z0-9]{1,5})\)/g)].map((p) => p[1])
+        : [];
     return {
         title,
         part,
         section: sectionNum ? `${part}.${sectionNum}` : undefined,
+        paragraphs,
     };
 }
+/**
+ * Cap on returned text, matching the contract eoir.ts already uses for BIA
+ * decisions. § 214.2 alone is ~700k characters — roughly 176k tokens — which
+ * overflows most context windows if returned whole.
+ */
+const MAX_TEXT_CHARS = 40_000;
 /**
  * eCFR titles have a publication lag — using "today" returns 404 when the
  * title hasn't been updated yet. This fetches the actual latest issue date.
@@ -71,14 +84,17 @@ async function getLatestIssueDate(titleNumber) {
     return date;
 }
 export async function getSection(citation) {
-    const { title, part, section } = parseCitation(citation);
+    const { title, part, section, paragraphs } = parseCitation(citation);
     // Use the actual latest published date — eCFR has a multi-day publication
     // lag and returns 404 if you request a date past the latest issue date.
     const issueDate = await getLatestIssueDate(title);
     // We request the whole part as XML and then extract the section we want.
     // Pulling the whole part is cheap (most parts are <1MB) and we cache it.
     const url = `${BASE}/api/versioner/v1/full/${issueDate}/title-${title}.xml?part=${part}`;
-    const cacheKey = `ecfr:section:${title}:${part}:${section ?? "all"}`;
+    // The paragraph must be part of the key. Without it every paragraph of a
+    // section shares one entry, so the first one fetched is served for all.
+    const paragraphKey = paragraphs.length ? paragraphs.join("|") : "whole";
+    const cacheKey = `ecfr:section:${title}:${part}:${section ?? "all"}:${paragraphKey}`;
     const cached = cache.get(cacheKey);
     if (cached)
         return { payload: cached, sourceUrl: url };
@@ -86,13 +102,27 @@ export async function getSection(citation) {
     if (status >= 400) {
         throw new Error(`eCFR returned ${status} for ${citation}. Body: ${body.slice(0, 200)}`);
     }
-    const extracted = extractSectionFromXml(body, { title, part, section });
+    const { text, resolved } = extractSectionFromXml(body, {
+        title,
+        part,
+        section,
+        paragraphs,
+    });
+    const truncated = text.length > MAX_TEXT_CHARS;
     const payload = {
         citation,
         title_label: `Title ${title}`,
         part_label: `Part ${part}`,
         section_label: section ? `§ ${section}` : undefined,
-        text: extracted,
+        paragraph_requested: paragraphs.length
+            ? paragraphs.map((p) => `(${p})`).join("")
+            : undefined,
+        paragraph_resolved: resolved.length
+            ? resolved.map((p) => `(${p})`).join("")
+            : undefined,
+        text: truncated ? text.slice(0, MAX_TEXT_CHARS) : text,
+        char_count: text.length,
+        truncated,
         effective_date: issueDate,
     };
     cache.set(cacheKey, payload, TTL.SIX_HOURS);
@@ -105,12 +135,23 @@ export async function getSection(citation) {
  */
 function extractSectionFromXml(xml, ref) {
     let chunk = xml;
+    const resolved = [];
     if (ref.section) {
         // eCFR sections are wrapped in <DIV8 N="214.2" TYPE="SECTION">…</DIV8>
         const re = new RegExp(`<DIV8[^>]*N="${ref.section.replace(/\./g, "\\.")}"[^>]*TYPE="SECTION"[\\s\\S]*?<\\/DIV8>`, "i");
         const m = xml.match(re);
         if (m)
             chunk = m[0];
+        // Narrow one level at a time, stopping at the first level we cannot
+        // prove. A wrong slice would return confident, wrong law; the parent is
+        // always a safe answer.
+        for (const designator of ref.paragraphs) {
+            const narrowed = sliceParagraph(chunk, designator);
+            if (!narrowed)
+                break;
+            chunk = narrowed;
+            resolved.push(designator);
+        }
     }
     // Strip tags but keep paragraph breaks
     const text = chunk
@@ -122,8 +163,74 @@ function extractSectionFromXml(xml, ref) {
         .replace(/[ \t]+/g, " ")
         .trim();
     if (!text) {
-        return "(Section text could not be extracted. The citation may be valid but require manual lookup at the source URL.)";
+        return {
+            text: "(Section text could not be extracted. The citation may be valid but require manual lookup at the source URL.)",
+            resolved,
+        };
     }
-    return text;
+    return { text, resolved };
+}
+const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
+const ROMANS = [
+    "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
+    "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx",
+];
+const UPPER = LETTERS.map((l) => l.toUpperCase());
+const NUMBERS = Array.from({ length: 60 }, (_, i) => String(i + 1));
+/**
+ * The sequence a designator belongs to. CFR nests as
+ * (a) → (1) → (i) → (A) → (1) → (i), so case carries meaning: a lowercase
+ * letter is level 1, an uppercase letter is level 4. Matching
+ * case-insensitively makes "(h)" collide with the "(H)" of an unrelated
+ * sub-list — in § 214.2 that is the difference between the H visa rules and
+ * a clause about commercial transactions under the B visa.
+ */
+function sequenceFor(designator) {
+    if (/^\d+$/.test(designator))
+        return NUMBERS;
+    if (UPPER.includes(designator))
+        return UPPER;
+    // "i" is ambiguous between letter and roman numeral; treat it as a letter,
+    // which is the level it occupies when it appears as a top-level paragraph.
+    if (designator !== "i" && ROMANS.includes(designator))
+        return ROMANS;
+    if (LETTERS.includes(designator))
+        return LETTERS;
+    return null;
+}
+/**
+ * Isolate one paragraph from an XML chunk.
+ *
+ * Designators cannot be matched by pattern alone: § 214.2 contains a nested
+ * "(i) Spouse;" thousands of characters before its real top-level "(i)". So we
+ * walk designators in document order and only accept one that is the next
+ * expected in its sequence, which pins each match to its level. Returns null
+ * when the designator cannot be proven, leaving the caller with the parent.
+ */
+function sliceParagraph(chunk, designator) {
+    const order = sequenceFor(designator);
+    if (!order)
+        return null;
+    const targetIdx = order.indexOf(designator);
+    if (targetIdx < 0)
+        return null;
+    const re = /<P[^>]*>\s*\(([A-Za-z0-9]{1,5})\)/g;
+    let expected = 0;
+    let startOffset = -1;
+    let m;
+    while ((m = re.exec(chunk)) !== null) {
+        if (m[1] !== order[expected])
+            continue;
+        if (expected === targetIdx) {
+            startOffset = m.index;
+            expected++;
+            continue;
+        }
+        if (startOffset >= 0 && expected === targetIdx + 1) {
+            return chunk.slice(startOffset, m.index); // next sibling — stop here
+        }
+        expected++;
+    }
+    return startOffset >= 0 ? chunk.slice(startOffset) : null;
 }
 //# sourceMappingURL=ecfr.js.map

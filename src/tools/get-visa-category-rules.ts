@@ -5,9 +5,15 @@ import { envelope, toolError, toolText } from "../lib/envelope.js";
 export const getVisaCategoryRulesSchema = {
   name: "get_visa_category_rules",
   description:
-    "Fetch the full current regulatory text for a specific CFR section " +
-    'governing a visa category. Accepts citations like "8 CFR 214.2" or ' +
-    '"8 CFR 214.2(h)". Pulls live from the eCFR versioner API.',
+    "Fetch the current regulatory text for a CFR section or paragraph " +
+    'governing a visa category. Accepts "8 CFR 214.2", "8 CFR 214.2(h)" or ' +
+    '"8 CFR 214.2(h)(4)"; cite the paragraph when you know it, because whole ' +
+    "sections are long and § 214.2 alone covers every nonimmigrant class. " +
+    "Check paragraph_resolved: when it is shorter than paragraph_requested, " +
+    "the deeper level could not be isolated and the parent was returned. Text " +
+    "is capped at 40,000 characters — when truncated is true, narrow the " +
+    "citation or read the rest at source_url. Pulls live from the eCFR " +
+    "versioner API.",
   inputSchema: {
     type: "object",
     properties: {
