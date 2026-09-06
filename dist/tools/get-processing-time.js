@@ -3,10 +3,15 @@ import { getProcessingTime, listFormTypes, listOffices } from "../sources/immigr
 import { envelope, toolError, toolText } from "../lib/envelope.js";
 export const getProcessingTimeSchema = {
     name: "get_processing_time",
-    description: "Fetch the current USCIS published processing time estimate for a form, " +
-        "sub-type, and service center. If sub-type or office is omitted, the " +
-        "tool picks sensible defaults (first available sub-type; SCOPS office " +
-        "where applicable). Returns a months-range plus the publication date.",
+    description: "Fetch published USCIS processing time estimates for a form. Estimates are " +
+        "published per office and they disagree by a lot — 96 offices publish an " +
+        "I-485 estimate spanning 6.5 to 70.5 months — so there is no single " +
+        "national number. With office_code, you get that office's range " +
+        '(scope="office"). Without it, you get the spread: median, fastest, ' +
+        'slowest and every office (scope="distribution"), and no top-level range, ' +
+        "because quoting one office as the answer would be misleading. Ask the " +
+        "user which office is handling the case, or quote the median and say it " +
+        "is a median.",
     inputSchema: {
         type: "object",
         properties: {
@@ -21,8 +26,9 @@ export const getProcessingTimeSchema = {
             },
             office_code: {
                 type: "string",
-                description: "Optional service center code (e.g. SCOPS, NSC, VSC). If omitted, " +
-                    "the tool defaults to SCOPS where present.",
+                description: 'Office code, e.g. "NBC", "NYC", "LOS". Omit to get the spread ' +
+                    "across all offices instead of one office's figure. Use " +
+                    "list_options to see which codes publish data for this form.",
             },
             list_options: {
                 type: "boolean",
