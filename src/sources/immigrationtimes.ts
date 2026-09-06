@@ -61,15 +61,53 @@ export interface Office {
   office_description?: string;
 }
 
+export interface OfficeTime {
+  office_code: string;
+  subtype: string;
+  subtype_info?: string;
+  low_months: number;
+  high_months: number;
+  publication_date?: string;
+  service_request_date?: string;
+}
+
+/**
+ * How the numbers below were arrived at.
+ *
+ * "office" — a specific office was asked for and found, so the range is that
+ * office's published estimate.
+ *
+ * "distribution" — no office was named. Processing time is published per
+ * office and they disagree enormously: 96 offices publish an I-485 estimate
+ * ranging from 6.5 to 70.5 months. There is no single correct number to give,
+ * so none is given — the spread is returned instead.
+ */
+export type ProcessingTimeScope = "office" | "distribution";
+
 export interface ProcessingTimeResult {
   form_id: string;
-  form_type_used: string;
-  office_code: string;
+  scope: ProcessingTimeScope;
+  form_type_used?: string;
+  /** Set only when scope is "office". */
+  office_code?: string;
   office_description?: string;
+  /** Set only when scope is "office" — never a stand-in for the whole country. */
   range_low_months?: number;
   range_high_months?: number;
   service_request_date?: string;
   publication_date?: string;
+  /** Set only when scope is "distribution". */
+  distribution?: {
+    offices_with_data: number;
+    /** Ranked by the midpoint of each office's range. */
+    median: OfficeTime;
+    fastest: OfficeTime;
+    slowest: OfficeTime;
+    /** The aggregator's own published average across offices, if given. */
+    published_average_low_months?: number;
+    published_average_high_months?: number;
+    offices: OfficeTime[];
+  };
   attribution: string;
   raw: unknown;
 }
@@ -159,40 +197,110 @@ export async function getProcessingTime(args: {
   }
 
   if (args.officeCode) {
+    const wanted = args.officeCode.toUpperCase();
     const byOffice = candidates.filter(
-      (e) => e.office_code.toUpperCase() === args.officeCode!.toUpperCase(),
+      (e) => e.office_code.toUpperCase() === wanted,
     );
-    if (byOffice.length) candidates = byOffice;
-  }
+    if (!byOffice.length) {
+      const available = [...new Set(candidates.map((e) => e.office_code))].sort();
+      throw new Error(
+        `No processing time published for ${form.form} at office "${args.officeCode}". ` +
+          `Offices with data: ${available.join(", ") || "(none)"}.`,
+      );
+    }
 
-  const match = candidates[0];
-
-  if (match) {
-    const payload: ProcessingTimeResult = {
-      form_id: form.form,
-      form_type_used: match.subtype,
-      office_code: match.office_code,
-      office_description: match.subtype_info,
-      range_low_months: match.lower_months ?? undefined,
-      range_high_months: match.upper_months ?? undefined,
-      service_request_date: match.service_request_date,
-      publication_date: match.publication_date,
-      attribution: form.attribution,
-      raw: match,
+    // One office, one answer.
+    const match = byOffice[0];
+    return {
+      payload: {
+        form_id: form.form,
+        scope: "office",
+        form_type_used: match.subtype,
+        office_code: match.office_code,
+        office_description: match.subtype_info,
+        range_low_months: match.lower_months ?? undefined,
+        range_high_months: match.upper_months ?? undefined,
+        service_request_date: match.service_request_date,
+        publication_date: match.publication_date,
+        attribution: form.attribution,
+        raw: match,
+      },
+      sourceUrl: url,
     };
-    return { payload, sourceUrl: url };
   }
 
-  // Fall back to top-level aggregate when no office entry matches filters
+  // No office named. The previous behaviour took candidates[0] — whichever
+  // office happened to come first in the array — and presented it as the
+  // processing time for the form. For I-130 that is FOD at 167-300 months
+  // against a median of 53.5-71, an answer wrong by a factor of three and
+  // indistinguishable from a considered one. Return the spread instead.
+  const times = candidates
+    .filter((e) => e.lower_months !== null && e.upper_months !== null)
+    .map<OfficeTime>((e) => ({
+      office_code: e.office_code,
+      subtype: e.subtype,
+      subtype_info: e.subtype_info,
+      low_months: e.lower_months as number,
+      high_months: e.upper_months as number,
+      publication_date: e.publication_date,
+      service_request_date: e.service_request_date,
+    }));
+
   const pt = form.processing_time;
-  const payload: ProcessingTimeResult = {
-    form_id: form.form,
-    form_type_used: "aggregate",
-    office_code: "all",
-    range_low_months: pt.avg_lower_months,
-    range_high_months: pt.avg_upper_months,
-    attribution: form.attribution,
-    raw: pt,
+
+  if (!times.length) {
+    // Nothing per-office: the aggregator's own average is all there is.
+    return {
+      payload: {
+        form_id: form.form,
+        scope: "distribution",
+        distribution: {
+          offices_with_data: 0,
+          median: EMPTY_TIME,
+          fastest: EMPTY_TIME,
+          slowest: EMPTY_TIME,
+          published_average_low_months: pt?.avg_lower_months,
+          published_average_high_months: pt?.avg_upper_months,
+          offices: [],
+        },
+        attribution: form.attribution,
+        raw: pt,
+      },
+      sourceUrl: url,
+    };
+  }
+
+  const ranked = [...times].sort((a, b) => midpoint(a) - midpoint(b));
+
+  return {
+    payload: {
+      form_id: form.form,
+      scope: "distribution",
+      form_type_used: args.formType,
+      publication_date: times[0].publication_date,
+      distribution: {
+        offices_with_data: ranked.length,
+        median: ranked[Math.floor(ranked.length / 2)],
+        fastest: ranked[0],
+        slowest: ranked[ranked.length - 1],
+        published_average_low_months: pt?.avg_lower_months,
+        published_average_high_months: pt?.avg_upper_months,
+        offices: ranked,
+      },
+      attribution: form.attribution,
+      raw: pt,
+    },
+    sourceUrl: url,
   };
-  return { payload, sourceUrl: url };
+}
+
+const EMPTY_TIME: OfficeTime = {
+  office_code: "",
+  subtype: "",
+  low_months: 0,
+  high_months: 0,
+};
+
+function midpoint(t: OfficeTime): number {
+  return (t.low_months + t.high_months) / 2;
 }
