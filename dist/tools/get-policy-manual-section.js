@@ -4,8 +4,11 @@ import { envelope, toolError, toolText } from "../lib/envelope.js";
 export const getPolicyManualSectionSchema = {
     name: "get_policy_manual_section",
     description: "Fetch the policy text of a USCIS Policy Manual volume, part, or chapter " +
-        "by slug. Returns the page title, structured sections (each with a heading " +
-        "and text), and a full_text concatenation. Obtain slugs from get_policy_manual_toc.",
+        "by slug. Returns the page title, structured sections (each with a heading, " +
+        "text, char_count and truncated flag), and a full_text concatenation. " +
+        "Sections are capped at 5,000 characters: when truncated is true the text " +
+        "is incomplete, and the rest is at source_url — say so rather than " +
+        "answering as if the passage were whole. Obtain slugs from get_policy_manual_toc.",
     inputSchema: {
         type: "object",
         properties: {
